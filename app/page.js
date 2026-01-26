@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 
 const API_URL = 'https://hqr2yft2ej.execute-api.ap-northeast-2.amazonaws.com/prod/balances'
+const SNAPSHOTS_URL = 'https://hqr2yft2ej.execute-api.ap-northeast-2.amazonaws.com/prod/snapshots'
 
 const formatUSD = (n) => {
   if (n === undefined || n === null) return '$0'
@@ -21,7 +22,10 @@ const formatAmount = (n) => {
 
 export default function Dashboard() {
   const [data, setData] = useState(null)
+  const [snapshots, setSnapshots] = useState([])
   const [loading, setLoading] = useState(true)
+  const [view, setView] = useState('current') // 'current' or 'history'
+  const [selectedDate, setSelectedDate] = useState(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -35,9 +39,25 @@ export default function Dashboard() {
     setLoading(false)
   }
 
+  const fetchSnapshots = async () => {
+    try {
+      const res = await fetch(SNAPSHOTS_URL)
+      const json = await res.json()
+      setSnapshots(json.snapshots || [])
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   useEffect(() => {
     fetchData()
+    fetchSnapshots()
   }, [])
+
+  // 히스토리 뷰에서 선택된 날짜의 데이터
+  const displayData = selectedDate 
+    ? snapshots.find(s => s.date === selectedDate) 
+    : data
 
   if (!data && loading) {
     return (
@@ -47,17 +67,15 @@ export default function Dashboard() {
     )
   }
 
-  // 모든 코인 수집 및 정렬 (USD 가치 기준)
+  // 데이터 파싱
   const coinTotals = {}
   const rows = []
-
-  // 데이터 파싱 - 모든 6개 거래소
   const exchangeOrder = ['binance', 'bybit', 'okx', 'zoomex', 'kucoin', 'kraken']
   
+  const balances = displayData?.balances || data?.balances || {}
+  
   for (const ex of exchangeOrder) {
-    const exData = data?.balances?.[ex]
-    
-    // Master 계정 - 항상 표시
+    const exData = balances[ex]
     const masterBal = exData?.master_breakdown || {}
     const masterUsd = exData?.master_usd || 0
     
@@ -80,7 +98,6 @@ export default function Dashboard() {
     }
     rows.push(masterRow)
 
-    // Subaccounts
     const subs = exData?.subaccounts_usd || {}
     for (const [subName, subData] of Object.entries(subs)) {
       if (Math.abs(subData.usd) < 1) continue
@@ -104,21 +121,20 @@ export default function Dashboard() {
     }
   }
 
-  // 상위 코인 선택 (USD 가치 기준 상위 8개)
   const topCoins = Object.entries(coinTotals)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([coin]) => coin)
 
-  // 거래소별 합계
   const exchangeTotals = {}
   for (const ex of exchangeOrder) {
-    exchangeTotals[ex] = data?.balances?.[ex]?.exchange_total_usd || 0
+    exchangeTotals[ex] = balances[ex]?.exchange_total_usd || 0
   }
-  
-  // 디버깅
-  
-  
+
+  // 차트 데이터
+  const chartData = [...snapshots].reverse()
+  const maxTotal = Math.max(...chartData.map(s => s.grand_total_usd), displayData?.grand_total_usd || 0)
+  const minTotal = Math.min(...chartData.map(s => s.grand_total_usd), displayData?.grand_total_usd || 0) * 0.95
 
   return (
     <div style={{
@@ -140,18 +156,50 @@ export default function Dashboard() {
         borderBottom: '2px solid #e0e0e0'
       }}>
         <div>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Total Balance</div>
+          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
+            {selectedDate ? `Snapshot: ${selectedDate}` : 'Total Balance'}
+          </div>
           <div style={{ fontSize: '32px', fontWeight: '700', color: '#1a1a1a' }}>
-            {formatUSD(data?.grand_total_usd)}
+            {formatUSD(displayData?.grand_total_usd)}
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={() => { setView('current'); setSelectedDate(null); }}
+            style={{
+              padding: '8px 16px',
+              background: view === 'current' ? '#2563eb' : '#f3f4f6',
+              color: view === 'current' ? '#fff' : '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '500'
+            }}
+          >
+            Current
+          </button>
+          <button
+            onClick={() => setView('history')}
+            style={{
+              padding: '8px 16px',
+              background: view === 'history' ? '#2563eb' : '#f3f4f6',
+              color: view === 'history' ? '#fff' : '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: '500'
+            }}
+          >
+            History
+          </button>
           <button
             onClick={fetchData}
             disabled={loading}
             style={{
               padding: '8px 20px',
-              background: loading ? '#ccc' : '#2563eb',
+              background: loading ? '#ccc' : '#10b981',
               color: '#fff',
               border: 'none',
               borderRadius: '6px',
@@ -160,15 +208,82 @@ export default function Dashboard() {
               fontWeight: '500'
             }}
           >
-            {loading ? 'Loading...' : 'Refresh'}
+            {loading ? '...' : 'Refresh'}
           </button>
-          <div style={{ fontSize: '11px', color: '#999', marginTop: '6px' }}>
-            {data?.timestamp ? new Date(data.timestamp).toLocaleString() : ''}
-          </div>
         </div>
       </div>
 
-      {/* Exchange Summary Bar - 모든 6개 거래소 */}
+      {/* History Chart */}
+      {view === 'history' && snapshots.length > 0 && (
+        <div style={{
+          marginBottom: '20px',
+          padding: '20px',
+          background: '#f8f9fa',
+          borderRadius: '12px',
+          border: '1px solid #e0e0e0'
+        }}>
+          <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '15px', color: '#374151' }}>
+            Balance History
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'end', 
+            height: '150px', 
+            gap: '2px',
+            paddingBottom: '25px',
+            position: 'relative'
+          }}>
+            {chartData.map((snap, idx) => {
+              const height = ((snap.grand_total_usd - minTotal) / (maxTotal - minTotal)) * 100
+              const isSelected = selectedDate === snap.date
+              return (
+                <div
+                  key={snap.date}
+                  onClick={() => setSelectedDate(snap.date)}
+                  style={{
+                    flex: 1,
+                    height: `${Math.max(height, 5)}%`,
+                    background: isSelected ? '#2563eb' : '#94a3b8',
+                    borderRadius: '3px 3px 0 0',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    minWidth: '8px',
+                    position: 'relative'
+                  }}
+                  title={`${snap.date}: ${formatUSD(snap.grand_total_usd)}`}
+                >
+                  {isSelected && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-22px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: '9px',
+                      color: '#2563eb',
+                      whiteSpace: 'nowrap',
+                      fontWeight: '600'
+                    }}>
+                      {snap.date.slice(5)}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            fontSize: '10px', 
+            color: '#9ca3af',
+            marginTop: '5px'
+          }}>
+            <span>{chartData[0]?.date}</span>
+            <span>{chartData[chartData.length - 1]?.date}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Exchange Summary */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(6, 1fr)',
@@ -211,84 +326,32 @@ export default function Dashboard() {
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
       }}>
-        <table style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse',
-          fontSize: '12px'
-        }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ background: '#f8f9fa' }}>
-              <th style={{ 
-                padding: '12px 16px', 
-                textAlign: 'left', 
-                fontWeight: '600',
-                borderBottom: '2px solid #e0e0e0',
-                color: '#374151',
-                width: '100px'
-              }}>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #e0e0e0', color: '#374151', width: '100px' }}>
                 Exchange
               </th>
-              <th style={{ 
-                padding: '12px 16px', 
-                textAlign: 'left', 
-                fontWeight: '600',
-                borderBottom: '2px solid #e0e0e0',
-                color: '#374151',
-                width: '180px'
-              }}>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #e0e0e0', color: '#374151', width: '180px' }}>
                 Account
               </th>
               {topCoins.map(coin => (
-                <th key={coin} style={{ 
-                  padding: '12px 8px', 
-                  textAlign: 'right', 
-                  fontWeight: '600',
-                  borderBottom: '2px solid #e0e0e0',
-                  color: '#374151',
-                  minWidth: '80px'
-                }}>
+                <th key={coin} style={{ padding: '12px 8px', textAlign: 'right', fontWeight: '600', borderBottom: '2px solid #e0e0e0', color: '#374151', minWidth: '80px' }}>
                   {coin}
                 </th>
               ))}
-              <th style={{ 
-                padding: '12px 16px', 
-                textAlign: 'right', 
-                fontWeight: '700',
-                borderBottom: '2px solid #e0e0e0',
-                color: '#1a1a1a',
-                background: '#e8f4fd',
-                minWidth: '120px'
-              }}>
+              <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', borderBottom: '2px solid #e0e0e0', color: '#1a1a1a', background: '#e8f4fd', minWidth: '120px' }}>
                 Total USD
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr 
-                key={idx} 
-                style={{ 
-                  background: row.isExchangeHeader ? '#fff' : (row.isSub ? '#fafafa' : '#fff'),
-                  borderBottom: '1px solid #f0f0f0'
-                }}
-              >
-                <td style={{ 
-                  padding: '10px 16px', 
-                  fontWeight: row.exchange ? '600' : '400',
-                  color: row.exchange ? '#1a1a1a' : '#666',
-                  borderRight: '1px solid #f0f0f0',
-                  background: row.isExchangeHeader ? '#f8f9fa' : 'transparent'
-                }}>
+              <tr key={idx} style={{ background: row.isExchangeHeader ? '#fff' : (row.isSub ? '#fafafa' : '#fff'), borderBottom: '1px solid #f0f0f0' }}>
+                <td style={{ padding: '10px 16px', fontWeight: row.exchange ? '600' : '400', color: row.exchange ? '#1a1a1a' : '#666', borderRight: '1px solid #f0f0f0', background: row.isExchangeHeader ? '#f8f9fa' : 'transparent' }}>
                   {row.exchange}
                 </td>
-                <td style={{ 
-                  padding: '10px 16px',
-                  paddingLeft: row.isSub ? '32px' : '16px',
-                  color: row.isSub ? '#666' : '#1a1a1a',
-                  fontFamily: row.isSub ? 'monospace' : 'inherit',
-                  fontSize: row.isSub ? '11px' : '12px',
-                  borderRight: '1px solid #f0f0f0'
-                }}>
+                <td style={{ padding: '10px 16px', paddingLeft: row.isSub ? '32px' : '16px', color: row.isSub ? '#666' : '#1a1a1a', fontFamily: row.isSub ? 'monospace' : 'inherit', fontSize: row.isSub ? '11px' : '12px', borderRight: '1px solid #f0f0f0' }}>
                   {row.account}
                 </td>
                 {topCoins.map(coin => {
@@ -297,27 +360,14 @@ export default function Dashboard() {
                   const usd = coinData?.usd
                   const amountStr = formatAmount(amount)
                   return (
-                    <td key={coin} style={{ 
-                      padding: '6px 8px', 
-                      textAlign: 'right',
-                      fontFamily: 'monospace',
-                      borderRight: '1px solid #f5f5f5',
-                      verticalAlign: 'middle'
-                    }}>
+                    <td key={coin} style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', borderRight: '1px solid #f5f5f5', verticalAlign: 'middle' }}>
                       {amountStr ? (
                         <div>
-                          <div style={{ 
-                            color: amount < 0 ? '#dc2626' : '#374151',
-                            fontSize: '12px'
-                          }}>
+                          <div style={{ color: amount < 0 ? '#dc2626' : '#374151', fontSize: '12px' }}>
                             {amountStr}
                           </div>
                           {usd && Math.abs(usd) >= 1 && (
-                            <div style={{ 
-                              color: '#9ca3af', 
-                              fontSize: '10px',
-                              marginTop: '2px'
-                            }}>
+                            <div style={{ color: '#9ca3af', fontSize: '10px', marginTop: '2px' }}>
                               {formatUSD(usd)}
                             </div>
                           )}
@@ -328,14 +378,7 @@ export default function Dashboard() {
                     </td>
                   )
                 })}
-                <td style={{ 
-                  padding: '10px 16px', 
-                  textAlign: 'right',
-                  fontWeight: '600',
-                  color: row.totalUsd < 0 ? '#dc2626' : (row.totalUsd === 0 ? '#9ca3af' : '#1a1a1a'),
-                  background: '#f0f7ff',
-                  fontFamily: 'monospace'
-                }}>
+                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '600', color: row.totalUsd < 0 ? '#dc2626' : (row.totalUsd === 0 ? '#9ca3af' : '#1a1a1a'), background: '#f0f7ff', fontFamily: 'monospace' }}>
                   {formatUSD(row.totalUsd)}
                 </td>
               </tr>
@@ -343,31 +386,14 @@ export default function Dashboard() {
           </tbody>
           <tfoot>
             <tr style={{ background: '#1e3a5f' }}>
-              <td colSpan={2} style={{ 
-                padding: '14px 16px', 
-                fontWeight: '700',
-                color: '#fff',
-                fontSize: '13px'
-              }}>
+              <td colSpan={2} style={{ padding: '14px 16px', fontWeight: '700', color: '#fff', fontSize: '13px' }}>
                 GRAND TOTAL
               </td>
               {topCoins.map(coin => (
-                <td key={coin} style={{ 
-                  padding: '14px 8px', 
-                  textAlign: 'right',
-                  color: '#94a3b8'
-                }}>
-                </td>
+                <td key={coin} style={{ padding: '14px 8px', textAlign: 'right', color: '#94a3b8' }}></td>
               ))}
-              <td style={{ 
-                padding: '14px 16px', 
-                textAlign: 'right',
-                fontWeight: '700',
-                color: '#fff',
-                fontSize: '16px',
-                fontFamily: 'monospace'
-              }}>
-                {formatUSD(data?.grand_total_usd)}
+              <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: '700', color: '#fff', fontSize: '16px', fontFamily: 'monospace' }}>
+                {formatUSD(displayData?.grand_total_usd)}
               </td>
             </tr>
           </tfoot>
@@ -375,13 +401,8 @@ export default function Dashboard() {
       </div>
 
       {/* Footer */}
-      <div style={{ 
-        marginTop: '16px', 
-        fontSize: '11px', 
-        color: '#9ca3af',
-        textAlign: 'center'
-      }}>
-        Auto-updates daily at 5PM SGT
+      <div style={{ marginTop: '16px', fontSize: '11px', color: '#9ca3af', textAlign: 'center' }}>
+        Snapshots saved daily at 5PM SGT • {snapshots.length} snapshots available
       </div>
     </div>
   )
