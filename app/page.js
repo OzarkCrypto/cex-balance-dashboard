@@ -5,13 +5,14 @@ import { useState, useEffect } from 'react'
 const API_URL = 'https://hqr2yft2ej.execute-api.ap-northeast-2.amazonaws.com/prod/balances'
 
 const formatUSD = (n) => {
-  if (!n || Math.abs(n) < 0.01) return ''
+  if (n === undefined || n === null) return '$0'
+  if (Math.abs(n) < 0.01) return '$0'
   const prefix = n < 0 ? '-$' : '$'
   return prefix + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 const formatAmount = (n) => {
-  if (!n || Math.abs(n) < 0.0001) return ''
+  if (!n || Math.abs(n) < 0.0001) return '-'
   if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2) + 'M'
   if (Math.abs(n) >= 1000) return (n / 1000).toFixed(2) + 'K'
   if (Math.abs(n) >= 1) return n.toFixed(2)
@@ -50,32 +51,34 @@ export default function Dashboard() {
   const coinTotals = {}
   const rows = []
 
-  // 데이터 파싱
+  // 데이터 파싱 - 모든 6개 거래소
   const exchangeOrder = ['binance', 'bybit', 'okx', 'zoomex', 'kucoin', 'kraken']
   
   for (const ex of exchangeOrder) {
     const exData = data?.balances?.[ex]
-    if (!exData) continue
-
-    // Master 계정
-    const masterBal = exData.master_breakdown || {}
-    if (Object.keys(masterBal).length > 0 || exData.master_usd > 0) {
-      const row = {
-        exchange: ex.toUpperCase(),
-        account: 'Master',
-        balances: {},
-        totalUsd: exData.master_usd || 0
-      }
-      for (const [coin, info] of Object.entries(masterBal)) {
-        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '')
-        row.balances[cleanCoin] = (row.balances[cleanCoin] || 0) + info.amount
-        coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
-      }
-      if (row.totalUsd !== 0) rows.push(row)
+    
+    // Master 계정 - 항상 표시
+    const masterBal = exData?.master_breakdown || {}
+    const masterUsd = exData?.master_usd || 0
+    
+    const masterRow = {
+      exchange: ex.toUpperCase(),
+      account: 'Master',
+      balances: {},
+      totalUsd: masterUsd,
+      isExchangeHeader: true
     }
+    
+    for (const [coin, info] of Object.entries(masterBal)) {
+      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '')
+      masterRow.balances[cleanCoin] = (masterRow.balances[cleanCoin] || 0) + info.amount
+      coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
+    }
+    rows.push(masterRow)
 
     // Subaccounts
-    for (const [subName, subData] of Object.entries(exData.subaccounts_usd || {})) {
+    const subs = exData?.subaccounts_usd || {}
+    for (const [subName, subData] of Object.entries(subs)) {
       if (Math.abs(subData.usd) < 1) continue
       const row = {
         exchange: '',
@@ -99,13 +102,10 @@ export default function Dashboard() {
     .slice(0, 8)
     .map(([coin]) => coin)
 
-  // 거래소별 합계 계산
+  // 거래소별 합계
   const exchangeTotals = {}
   for (const ex of exchangeOrder) {
-    const exData = data?.balances?.[ex]
-    if (exData?.exchange_total_usd) {
-      exchangeTotals[ex] = exData.exchange_total_usd
-    }
+    exchangeTotals[ex] = data?.balances?.[ex]?.exchange_total_usd || 0
   }
 
   return (
@@ -156,27 +156,35 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Exchange Summary Bar */}
+      {/* Exchange Summary Bar - 모든 6개 거래소 */}
       <div style={{
-        display: 'flex',
-        gap: '12px',
-        marginBottom: '20px',
-        flexWrap: 'wrap'
+        display: 'grid',
+        gridTemplateColumns: 'repeat(6, 1fr)',
+        gap: '10px',
+        marginBottom: '20px'
       }}>
         {exchangeOrder.map(ex => {
-          const total = exchangeTotals[ex] || 0
-          if (total === 0) return null
+          const total = exchangeTotals[ex]
           return (
             <div key={ex} style={{
-              padding: '10px 16px',
-              background: '#f8f9fa',
+              padding: '12px 14px',
+              background: total > 0 ? '#f8f9fa' : '#fafafa',
               borderRadius: '8px',
-              border: '1px solid #e9ecef'
+              border: total > 0 ? '1px solid #e0e0e0' : '1px solid #eee'
             }}>
-              <div style={{ fontSize: '11px', color: '#666', textTransform: 'uppercase', fontWeight: '600' }}>
+              <div style={{ 
+                fontSize: '11px', 
+                color: total > 0 ? '#374151' : '#9ca3af', 
+                textTransform: 'uppercase', 
+                fontWeight: '600' 
+              }}>
                 {ex}
               </div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a1a' }}>
+              <div style={{ 
+                fontSize: '16px', 
+                fontWeight: '700', 
+                color: total > 0 ? '#1a1a1a' : '#d1d5db'
+              }}>
                 {formatUSD(total)}
               </div>
             </div>
@@ -248,7 +256,7 @@ export default function Dashboard() {
               <tr 
                 key={idx} 
                 style={{ 
-                  background: row.isSub ? '#fafafa' : '#fff',
+                  background: row.isExchangeHeader ? '#fff' : (row.isSub ? '#fafafa' : '#fff'),
                   borderBottom: '1px solid #f0f0f0'
                 }}
               >
@@ -256,7 +264,8 @@ export default function Dashboard() {
                   padding: '10px 16px', 
                   fontWeight: row.exchange ? '600' : '400',
                   color: row.exchange ? '#1a1a1a' : '#666',
-                  borderRight: '1px solid #f0f0f0'
+                  borderRight: '1px solid #f0f0f0',
+                  background: row.isExchangeHeader ? '#f8f9fa' : 'transparent'
                 }}>
                   {row.exchange}
                 </td>
@@ -264,8 +273,8 @@ export default function Dashboard() {
                   padding: '10px 16px',
                   paddingLeft: row.isSub ? '32px' : '16px',
                   color: row.isSub ? '#666' : '#1a1a1a',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
+                  fontFamily: row.isSub ? 'monospace' : 'inherit',
+                  fontSize: row.isSub ? '11px' : '12px',
                   borderRight: '1px solid #f0f0f0'
                 }}>
                   {row.account}
@@ -285,7 +294,7 @@ export default function Dashboard() {
                   padding: '10px 16px', 
                   textAlign: 'right',
                   fontWeight: '600',
-                  color: row.totalUsd < 0 ? '#dc2626' : '#1a1a1a',
+                  color: row.totalUsd < 0 ? '#dc2626' : (row.totalUsd === 0 ? '#9ca3af' : '#1a1a1a'),
                   background: '#f0f7ff',
                   fontFamily: 'monospace'
                 }}>
@@ -334,7 +343,7 @@ export default function Dashboard() {
         color: '#9ca3af',
         textAlign: 'center'
       }}>
-        Auto-updates daily at 5PM SGT • Last refresh: {data?.timestamp ? new Date(data.timestamp).toLocaleString() : '-'}
+        Auto-updates daily at 5PM SGT
       </div>
     </div>
   )
