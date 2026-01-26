@@ -402,7 +402,7 @@ export default function Dashboard() {
 
       {/* Footer */}
       <div style={{ marginTop: '16px', fontSize: '11px', color: '#9ca3af', textAlign: 'center' }}>
-        Snapshots saved daily at 5PM SGT • {snapshots.length} snapshots available
+        Last updated: {data?.timestamp ? new Date(data.timestamp).toLocaleString() : '-'} • Snapshots saved daily at 5PM SGT • {snapshots.length} snapshots available
       </div>
     </div>
   )
