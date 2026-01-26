@@ -17,6 +17,153 @@ const formatNum = (n) => {
   return n.toLocaleString('en-US', { maximumFractionDigits: 4 })
 }
 
+const styles = {
+  container: {
+    maxWidth: '900px',
+    margin: '0 auto',
+    padding: '20px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontSize: '14px',
+    color: '#333',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #eee',
+    paddingBottom: '15px',
+    marginBottom: '20px',
+  },
+  totalLabel: {
+    fontSize: '12px',
+    color: '#888',
+    marginBottom: '4px',
+  },
+  totalValue: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+  },
+  refreshBtn: {
+    padding: '8px 16px',
+    background: '#f5f5f5',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+  },
+  timestamp: {
+    fontSize: '11px',
+    color: '#999',
+    marginTop: '8px',
+  },
+  summaryGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(6, 1fr)',
+    gap: '10px',
+    marginBottom: '25px',
+  },
+  summaryCard: {
+    padding: '12px',
+    background: '#f9f9f9',
+    borderRadius: '6px',
+  },
+  summaryLabel: {
+    fontSize: '11px',
+    color: '#888',
+    textTransform: 'capitalize',
+  },
+  summaryValue: {
+    fontWeight: '600',
+    marginTop: '2px',
+  },
+  exchangeCard: {
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    marginBottom: '20px',
+    overflow: 'hidden',
+  },
+  exchangeHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
+    background: '#fafafa',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  exchangeName: {
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  exchangeTotal: {
+    fontWeight: 'bold',
+    fontSize: '16px',
+  },
+  section: {
+    padding: '12px 16px',
+  },
+  sectionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '12px',
+    color: '#666',
+    marginBottom: '10px',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+  },
+  tr: {
+    borderBottom: '1px solid #f0f0f0',
+  },
+  td: {
+    padding: '6px 0',
+  },
+  tdCoin: {
+    fontFamily: 'monospace',
+    fontSize: '12px',
+  },
+  tdAmount: {
+    textAlign: 'right',
+  },
+  tdUsd: {
+    textAlign: 'right',
+    color: '#888',
+    width: '100px',
+  },
+  subaccountBox: {
+    marginBottom: '12px',
+    border: '1px solid #eee',
+    borderRadius: '6px',
+    overflow: 'hidden',
+  },
+  subaccountHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    background: '#f5f5f5',
+    fontSize: '12px',
+    fontWeight: '500',
+  },
+  subaccountName: {
+    maxWidth: '250px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  negative: {
+    color: '#d32f2f',
+  },
+  subTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '12px',
+  },
+  subTd: {
+    padding: '5px 12px',
+    borderBottom: '1px solid #f5f5f5',
+  },
+}
+
 export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,12 +171,12 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     setLoading(true)
-    setError(null)
     try {
       const res = await fetch(API_URL)
       if (!res.ok) throw new Error('API Error')
       const json = await res.json()
       setData(json)
+      setError(null)
     } catch (e) {
       setError(e.message)
     }
@@ -38,49 +185,62 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
-    const i = setInterval(fetchData, 60000)
-    return () => clearInterval(i)
+    const interval = setInterval(fetchData, 60000)
+    return () => clearInterval(interval)
   }, [])
 
   if (!data && loading) {
-    return <div style={styles.loading}>Loading...</div>
+    return (
+      <div style={{ ...styles.container, textAlign: 'center', paddingTop: '100px' }}>
+        Loading...
+      </div>
+    )
   }
 
-  if (error) {
-    return <div style={styles.error}>Error: {error}</div>
+  if (error && !data) {
+    return (
+      <div style={{ ...styles.container, textAlign: 'center', paddingTop: '100px', color: '#d32f2f' }}>
+        Error: {error}
+      </div>
+    )
   }
 
   const exchanges = Object.entries(data?.balances || {})
     .filter(([_, d]) => (d.exchange_total_usd || 0) !== 0)
     .sort((a, b) => Math.abs(b[1].exchange_total_usd || 0) - Math.abs(a[1].exchange_total_usd || 0))
 
+  const exchangeList = ['binance', 'bybit', 'okx', 'kucoin', 'kraken', 'zoomex']
+
   return (
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
         <div>
-          <div style={styles.label}>Total Balance</div>
-          <div style={styles.totalAmount}>{formatUSD(data?.grand_total_usd)}</div>
+          <div style={styles.totalLabel}>Total Balance</div>
+          <div style={styles.totalValue}>{formatUSD(data?.grand_total_usd)}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <button 
+            style={styles.refreshBtn} 
+            onClick={fetchData}
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
           <div style={styles.timestamp}>
-            Updated: {data?.timestamp ? new Date(data.timestamp).toLocaleString() : '-'}
+            {data?.timestamp ? new Date(data.timestamp).toLocaleString() : ''}
           </div>
         </div>
-        <button onClick={fetchData} disabled={loading} style={styles.refreshBtn}>
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
       </div>
 
       {/* Summary Grid */}
       <div style={styles.summaryGrid}>
-        {['binance', 'bybit', 'okx', 'kucoin', 'kraken', 'zoomex'].map(ex => {
+        {exchangeList.map(ex => {
           const d = data?.balances?.[ex]
-          const total = d?.exchange_total_usd || 0
           return (
             <div key={ex} style={styles.summaryCard}>
-              <div style={styles.summaryLabel}>{ex.toUpperCase()}</div>
-              <div style={{...styles.summaryValue, color: total === 0 ? '#999' : '#000'}}>
-                {formatUSD(total)}
-              </div>
+              <div style={styles.summaryLabel}>{ex}</div>
+              <div style={styles.summaryValue}>{formatUSD(d?.exchange_total_usd || 0)}</div>
             </div>
           )
         })}
@@ -89,14 +249,15 @@ export default function Dashboard() {
       {/* Exchange Details */}
       {exchanges.map(([exName, exData]) => (
         <div key={exName} style={styles.exchangeCard}>
+          {/* Header */}
           <div style={styles.exchangeHeader}>
-            <span style={styles.exchangeName}>{exName.toUpperCase()}</span>
+            <span style={styles.exchangeName}>{exName}</span>
             <span style={styles.exchangeTotal}>{formatUSD(exData.exchange_total_usd)}</span>
           </div>
 
           {/* Master Account */}
           {(exData.master_usd || 0) !== 0 && (
-            <div style={styles.section}>
+            <div style={{ ...styles.section, borderBottom: '1px solid #e0e0e0' }}>
               <div style={styles.sectionHeader}>
                 <span>Master Account</span>
                 <span>{formatUSD(exData.master_usd)}</span>
@@ -107,10 +268,10 @@ export default function Dashboard() {
                     .filter(([_, v]) => Math.abs(v.usd) >= 1)
                     .sort((a, b) => Math.abs(b[1].usd) - Math.abs(a[1].usd))
                     .map(([coin, info]) => (
-                      <tr key={coin}>
-                        <td style={styles.coinCell}>{coin}</td>
-                        <td style={styles.amountCell}>{formatNum(info.amount)}</td>
-                        <td style={styles.usdCell}>{formatUSD(info.usd)}</td>
+                      <tr key={coin} style={styles.tr}>
+                        <td style={{ ...styles.td, ...styles.tdCoin }}>{coin}</td>
+                        <td style={{ ...styles.td, ...styles.tdAmount }}>{formatNum(info.amount)}</td>
+                        <td style={{ ...styles.td, ...styles.tdUsd }}>{formatUSD(info.usd)}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -129,23 +290,23 @@ export default function Dashboard() {
                 .filter(([_, v]) => Math.abs(v.usd) >= 1)
                 .sort((a, b) => Math.abs(b[1].usd) - Math.abs(a[1].usd))
                 .map(([subName, subData]) => (
-                  <div key={subName} style={styles.subaccount}>
+                  <div key={subName} style={styles.subaccountBox}>
                     <div style={styles.subaccountHeader}>
                       <span style={styles.subaccountName} title={subName}>{subName}</span>
-                      <span style={{...styles.subaccountTotal, color: subData.usd < 0 ? '#dc3545' : '#000'}}>
+                      <span style={subData.usd < 0 ? styles.negative : {}}>
                         {formatUSD(subData.usd)}
                       </span>
                     </div>
-                    <table style={styles.table}>
+                    <table style={styles.subTable}>
                       <tbody>
                         {Object.entries(subData.breakdown || {})
                           .filter(([_, v]) => Math.abs(v.usd) >= 0.01)
                           .sort((a, b) => Math.abs(b[1].usd) - Math.abs(a[1].usd))
                           .map(([coin, info]) => (
                             <tr key={coin}>
-                              <td style={styles.coinCell}>{coin}</td>
-                              <td style={styles.amountCell}>{formatNum(info.amount)}</td>
-                              <td style={{...styles.usdCell, color: info.usd < 0 ? '#dc3545' : '#666'}}>
+                              <td style={{ ...styles.subTd, fontFamily: 'monospace' }}>{coin}</td>
+                              <td style={{ ...styles.subTd, textAlign: 'right' }}>{formatNum(info.amount)}</td>
+                              <td style={{ ...styles.subTd, textAlign: 'right', color: '#888', width: '90px' }}>
                                 {formatUSD(info.usd)}
                               </td>
                             </tr>
@@ -160,169 +321,4 @@ export default function Dashboard() {
       ))}
     </div>
   )
-}
-
-const styles = {
-  container: {
-    maxWidth: '900px',
-    margin: '0 auto',
-    padding: '20px',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-    fontSize: '14px',
-    color: '#333',
-    background: '#fff',
-    minHeight: '100vh',
-  },
-  loading: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    fontSize: '16px',
-    color: '#666',
-  },
-  error: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    fontSize: '16px',
-    color: '#dc3545',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottom: '1px solid #e0e0e0',
-    paddingBottom: '16px',
-    marginBottom: '20px',
-  },
-  label: {
-    fontSize: '12px',
-    color: '#666',
-    marginBottom: '4px',
-  },
-  totalAmount: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#000',
-  },
-  timestamp: {
-    fontSize: '11px',
-    color: '#999',
-    marginTop: '4px',
-  },
-  refreshBtn: {
-    padding: '8px 16px',
-    fontSize: '12px',
-    background: '#f5f5f5',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  summaryGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(6, 1fr)',
-    gap: '8px',
-    marginBottom: '24px',
-  },
-  summaryCard: {
-    padding: '12px',
-    background: '#f8f9fa',
-    borderRadius: '4px',
-  },
-  summaryLabel: {
-    fontSize: '10px',
-    color: '#666',
-    marginBottom: '4px',
-    fontWeight: '500',
-  },
-  summaryValue: {
-    fontSize: '13px',
-    fontWeight: '600',
-  },
-  exchangeCard: {
-    border: '1px solid #e0e0e0',
-    borderRadius: '6px',
-    marginBottom: '16px',
-    overflow: 'hidden',
-  },
-  exchangeHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 16px',
-    background: '#f8f9fa',
-    borderBottom: '1px solid #e0e0e0',
-  },
-  exchangeName: {
-    fontWeight: '600',
-    fontSize: '14px',
-  },
-  exchangeTotal: {
-    fontWeight: '700',
-    fontSize: '16px',
-  },
-  section: {
-    padding: '12px 16px',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '12px',
-    color: '#666',
-    marginBottom: '8px',
-    fontWeight: '500',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  coinCell: {
-    padding: '6px 0',
-    fontFamily: "'SF Mono', 'Monaco', monospace",
-    fontSize: '12px',
-    borderBottom: '1px solid #f5f5f5',
-  },
-  amountCell: {
-    padding: '6px 8px',
-    textAlign: 'right',
-    fontFamily: "'SF Mono', 'Monaco', monospace",
-    fontSize: '12px',
-    borderBottom: '1px solid #f5f5f5',
-  },
-  usdCell: {
-    padding: '6px 0',
-    textAlign: 'right',
-    color: '#666',
-    fontSize: '12px',
-    width: '100px',
-    borderBottom: '1px solid #f5f5f5',
-  },
-  subaccount: {
-    marginBottom: '12px',
-    background: '#fafafa',
-    borderRadius: '4px',
-    padding: '8px',
-  },
-  subaccountHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginBottom: '8px',
-    paddingBottom: '6px',
-    borderBottom: '1px solid #eee',
-  },
-  subaccountName: {
-    fontSize: '12px',
-    fontWeight: '500',
-    maxWidth: '250px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  subaccountTotal: {
-    fontSize: '13px',
-    fontWeight: '600',
-  },
 }
