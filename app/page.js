@@ -12,7 +12,7 @@ const EXCHANGES = [
 ]
 
 const formatNumber = (num, decimals = 2) => {
-  if (num === null || num === undefined) return '-'
+  if (num === null || num === undefined || isNaN(num)) return '-'
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -20,7 +20,7 @@ const formatNumber = (num, decimals = 2) => {
 }
 
 const formatUSD = (num) => {
-  if (num === null || num === undefined) return '-'
+  if (num === null || num === undefined || isNaN(num)) return '-'
   if (num >= 1000000) {
     return `$${(num / 1000000).toFixed(2)}M`
   }
@@ -44,28 +44,29 @@ export default function Dashboard() {
   }, [])
 
   const fetchBalances = async () => {
+    setLoading(true)
     try {
       const res = await fetch('/api/balances')
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
-      setBalances(data.balances || {})
+      
+      // API 응답을 대시보드 형식으로 변환
+      const formatted = {}
+      EXCHANGES.forEach(ex => {
+        const assets = data.balances?.[ex.id] || []
+        const totalUsd = assets.reduce((sum, a) => sum + (a.usdValue || 0), 0)
+        formatted[ex.id] = {
+          total_usd: totalUsd,
+          assets: assets,
+          error: data.errors?.[ex.id]
+        }
+      })
+      
+      setBalances(formatted)
       setLastUpdate(new Date())
       setError(null)
     } catch (err) {
       setError('데이터를 불러올 수 없습니다')
-      // 데모 데이터 표시
-      setBalances({
-        binance: { 
-          total_usd: 0, 
-          assets: [],
-          sub_accounts: []
-        },
-        bybit: { total_usd: 0, assets: [], sub_accounts: [] },
-        okx: { total_usd: 0, assets: [], sub_accounts: [] },
-        kucoin: { total_usd: 0, assets: [], sub_accounts: [] },
-        kraken: { total_usd: 0, assets: [], sub_accounts: [] },
-        zoomex: { total_usd: 0, assets: [], sub_accounts: [] },
-      })
     } finally {
       setLoading(false)
     }
