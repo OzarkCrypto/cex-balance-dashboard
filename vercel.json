@@ -1,12 +1,3 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
-  "regions": ["sin1"],
-  "functions": {
-    "app/api/**/*.js": {
-      "runtime": "nodejs20.x",
-      "regions": ["sin1"]
-    }
-  }
+  "regions": ["sin1"]
 }
