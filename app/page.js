@@ -115,6 +115,10 @@ export default function Dashboard() {
   for (const ex of exchangeOrder) {
     exchangeTotals[ex] = data?.balances?.[ex]?.exchange_total_usd || 0
   }
+  
+  // 디버깅
+  console.log('Exchange Totals:', exchangeTotals)
+  console.log('OKX raw data:', data?.balances?.okx)
 
   return (
     <div style={{
