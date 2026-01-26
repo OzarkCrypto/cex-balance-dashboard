@@ -117,8 +117,8 @@ export default function Dashboard() {
   }
   
   // 디버깅
-  console.log('Exchange Totals:', exchangeTotals)
-  console.log('OKX raw data:', data?.balances?.okx)
+  
+  
 
   return (
     <div style={{
