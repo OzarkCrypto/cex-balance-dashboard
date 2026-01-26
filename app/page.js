@@ -12,7 +12,7 @@ const formatUSD = (n) => {
 }
 
 const formatAmount = (n) => {
-  if (!n || Math.abs(n) < 0.0001) return '-'
+  if (!n || Math.abs(n) < 0.0001) return null
   if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2) + 'M'
   if (Math.abs(n) >= 1000) return (n / 1000).toFixed(2) + 'K'
   if (Math.abs(n) >= 1) return n.toFixed(2)
@@ -71,7 +71,11 @@ export default function Dashboard() {
     
     for (const [coin, info] of Object.entries(masterBal)) {
       const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '')
-      masterRow.balances[cleanCoin] = (masterRow.balances[cleanCoin] || 0) + info.amount
+      const existing = masterRow.balances[cleanCoin] || { amount: 0, usd: 0 }
+      masterRow.balances[cleanCoin] = {
+        amount: existing.amount + info.amount,
+        usd: existing.usd + (info.usd || 0)
+      }
       coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
     }
     rows.push(masterRow)
@@ -89,7 +93,11 @@ export default function Dashboard() {
       }
       for (const [coin, info] of Object.entries(subData.breakdown || {})) {
         const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '')
-        row.balances[cleanCoin] = (row.balances[cleanCoin] || 0) + info.amount
+        const existing = row.balances[cleanCoin] || { amount: 0, usd: 0 }
+        row.balances[cleanCoin] = {
+          amount: existing.amount + info.amount,
+          usd: existing.usd + (info.usd || 0)
+        }
         coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
       }
       rows.push(row)
@@ -279,17 +287,43 @@ export default function Dashboard() {
                 }}>
                   {row.account}
                 </td>
-                {topCoins.map(coin => (
-                  <td key={coin} style={{ 
-                    padding: '10px 8px', 
-                    textAlign: 'right',
-                    fontFamily: 'monospace',
-                    color: (row.balances[coin] || 0) < 0 ? '#dc2626' : '#374151',
-                    borderRight: '1px solid #f5f5f5'
-                  }}>
-                    {formatAmount(row.balances[coin])}
-                  </td>
-                ))}
+                {topCoins.map(coin => {
+                  const coinData = row.balances[coin]
+                  const amount = coinData?.amount
+                  const usd = coinData?.usd
+                  const amountStr = formatAmount(amount)
+                  return (
+                    <td key={coin} style={{ 
+                      padding: '6px 8px', 
+                      textAlign: 'right',
+                      fontFamily: 'monospace',
+                      borderRight: '1px solid #f5f5f5',
+                      verticalAlign: 'middle'
+                    }}>
+                      {amountStr ? (
+                        <div>
+                          <div style={{ 
+                            color: amount < 0 ? '#dc2626' : '#374151',
+                            fontSize: '12px'
+                          }}>
+                            {amountStr}
+                          </div>
+                          {usd && Math.abs(usd) >= 1 && (
+                            <div style={{ 
+                              color: '#9ca3af', 
+                              fontSize: '10px',
+                              marginTop: '2px'
+                            }}>
+                              {formatUSD(usd)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#e5e7eb' }}>-</span>
+                      )}
+                    </td>
+                  )
+                })}
                 <td style={{ 
                   padding: '10px 16px', 
                   textAlign: 'right',
