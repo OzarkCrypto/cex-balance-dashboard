@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 
+const API_URL = 'https://hqr2yft2ej.execute-api.ap-northeast-2.amazonaws.com/prod/balances'
+
 const EXCHANGES = [
   { id: 'binance', name: 'Binance', color: '#F0B90B' },
   { id: 'bybit', name: 'Bybit', color: '#FF6600' },
@@ -11,43 +13,28 @@ const EXCHANGES = [
   { id: 'zoomex', name: 'Zoomex', color: '#00C8FF' },
 ]
 
-const formatNumber = (num, decimals = 2) => {
-  if (num === null || num === undefined || isNaN(num)) return '-'
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(num)
-}
-
-const formatUSD = (num) => {
-  if (num === null || num === undefined || isNaN(num)) return '$0.00'
-  return `$${formatNumber(num)}`
+const formatNumber = (num) => {
+  if (num === 0) return '0'
+  if (num < 0.00001) return num.toExponential(4)
+  if (num < 1) return num.toFixed(8).replace(/\.?0+$/, '')
+  if (num < 1000) return num.toFixed(4).replace(/\.?0+$/, '')
+  return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
 export default function Dashboard() {
-  const [balances, setBalances] = useState({})
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState(null)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchBalances = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const res = await fetch('/api/balances')
-      const data = await res.json()
-      
-      const formatted = {}
-      EXCHANGES.forEach(ex => {
-        const assets = data.balances?.[ex.id] || []
-        const totalUsd = assets.reduce((sum, a) => sum + (a.usdValue || 0), 0)
-        formatted[ex.id] = { total_usd: totalUsd, assets }
-      })
-      
-      setBalances(formatted)
-      setErrors(data.errors || {})
-      setLastUpdate(new Date())
+      const res = await fetch(API_URL)
+      const json = await res.json()
+      setData(json)
     } catch (err) {
-      console.error(err)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -57,80 +44,112 @@ export default function Dashboard() {
     fetchBalances()
   }, [])
 
-  const totalBalance = Object.values(balances).reduce(
-    (sum, ex) => sum + (ex?.total_usd || 0), 0
-  )
-
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>CEX Balance</h1>
+        <h1 style={styles.title}>💰 CEX Balance Dashboard</h1>
         <div style={styles.headerRight}>
-          {lastUpdate && (
-            <span style={styles.time}>{lastUpdate.toLocaleTimeString('ko-KR')}</span>
+          {data?.timestamp && (
+            <span style={styles.time}>
+              {new Date(data.timestamp).toLocaleString('ko-KR')}
+            </span>
           )}
-          <button 
-            onClick={fetchBalances} 
-            disabled={loading}
-            style={styles.btn}
-          >
-            {loading ? '...' : 'Refresh'}
+          <button onClick={fetchBalances} disabled={loading} style={styles.btn}>
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
       </header>
 
-      <div style={styles.totalRow}>
-        <span style={styles.totalLabel}>Total</span>
-        <span style={styles.totalValue}>{formatUSD(totalBalance)}</span>
-      </div>
+      {error && <div style={styles.errorBox}>Error: {error}</div>}
 
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Exchange</th>
-            <th style={styles.thRight}>Balance</th>
-            <th style={styles.thRight}>Assets</th>
-            <th style={styles.th}>Status</th>
-          </tr>
-        </thead>
-        <tbody>
+      {loading && !data ? (
+        <div style={styles.loading}>Loading...</div>
+      ) : (
+        <div style={styles.grid}>
           {EXCHANGES.map(ex => {
-            const data = balances[ex.id] || { total_usd: 0, assets: [] }
-            const error = errors[ex.id]
+            const balanceData = data?.balances?.[ex.id]
+            const exchangeError = data?.errors?.[ex.id]
             
             return (
-              <tr key={ex.id} style={styles.tr}>
-                <td style={styles.td}>
-                  <span style={{...styles.dot, background: ex.color}} />
-                  {ex.name}
-                </td>
-                <td style={styles.tdRight}>{formatUSD(data.total_usd)}</td>
-                <td style={styles.tdRight}>
-                  {data.assets.length > 0 
-                    ? data.assets.map(a => `${a.currency}: ${formatNumber(a.balance, 4)}`).join(', ')
-                    : '-'
-                  }
-                </td>
-                <td style={styles.td}>
-                  {error 
-                    ? <span style={styles.error}>Error</span>
-                    : data.assets.length > 0 
-                      ? <span style={styles.ok}>OK</span>
-                      : <span style={styles.empty}>Empty</span>
-                  }
-                </td>
-              </tr>
+              <div key={ex.id} style={styles.card}>
+                <div style={styles.cardHeader}>
+                  <div style={styles.exchangeName}>
+                    <span style={{...styles.dot, background: ex.color}} />
+                    {ex.name}
+                  </div>
+                  <span style={exchangeError ? styles.statusError : styles.statusOk}>
+                    {exchangeError ? 'Error' : 'Connected'}
+                  </span>
+                </div>
+
+                {exchangeError ? (
+                  <div style={styles.cardError}>{exchangeError}</div>
+                ) : (
+                  <>
+                    {balanceData?.master && Object.keys(balanceData.master).length > 0 && (
+                      <div style={styles.section}>
+                        <div style={styles.sectionTitle}>Master Account</div>
+                        <table style={styles.balanceTable}>
+                          <tbody>
+                            {Object.entries(balanceData.master)
+                              .sort((a, b) => b[1] - a[1])
+                              .map(([coin, amount]) => (
+                                <tr key={coin}>
+                                  <td style={styles.coinName}>{coin}</td>
+                                  <td style={styles.coinAmount}>{formatNumber(amount)}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {balanceData?.subaccounts && Object.keys(balanceData.subaccounts).length > 0 && (
+                      Object.entries(balanceData.subaccounts).map(([subName, subBal]) => (
+                        <div key={subName} style={styles.section}>
+                          <div style={styles.sectionTitle}>Sub: {subName}</div>
+                          <table style={styles.balanceTable}>
+                            <tbody>
+                              {Object.entries(subBal)
+                                .sort((a, b) => b[1] - a[1])
+                                .map(([coin, amount]) => (
+                                  <tr key={coin}>
+                                    <td style={styles.coinName}>{coin}</td>
+                                    <td style={styles.coinAmount}>{formatNumber(amount)}</td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))
+                    )}
+
+                    {balanceData?.total && Object.keys(balanceData.total).length > 0 && (
+                      <div style={{...styles.section, ...styles.totalSection}}>
+                        <div style={styles.sectionTitle}>Total</div>
+                        <table style={styles.balanceTable}>
+                          <tbody>
+                            {Object.entries(balanceData.total)
+                              .sort((a, b) => b[1] - a[1])
+                              .map(([coin, amount]) => (
+                                <tr key={coin}>
+                                  <td style={styles.coinName}>{coin}</td>
+                                  <td style={styles.coinAmount}>{formatNumber(amount)}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {(!balanceData?.total || Object.keys(balanceData.total).length === 0) && (
+                      <div style={styles.empty}>No balances</div>
+                    )}
+                  </>
+                )}
+              </div>
             )
           })}
-        </tbody>
-      </table>
-
-      {Object.keys(errors).length > 0 && (
-        <div style={styles.errorBox}>
-          <strong>Errors:</strong>
-          {Object.entries(errors).map(([ex, msg]) => (
-            <div key={ex}>{ex}: {msg}</div>
-          ))}
         </div>
       )}
     </div>
@@ -139,118 +158,139 @@ export default function Dashboard() {
 
 const styles = {
   container: {
-    maxWidth: '1000px',
+    maxWidth: '1400px',
     margin: '0 auto',
     padding: '20px',
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '20px',
+    marginBottom: '24px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #e5e7eb',
   },
   title: {
-    fontSize: '20px',
+    fontSize: '24px',
     fontWeight: '600',
+    margin: 0,
   },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '16px',
   },
   time: {
-    fontSize: '13px',
-    color: '#666',
+    fontSize: '14px',
+    color: '#6b7280',
   },
   btn: {
-    padding: '6px 14px',
+    padding: '8px 16px',
     background: '#000',
     color: '#fff',
     border: 'none',
-    borderRadius: '4px',
-    fontSize: '13px',
+    borderRadius: '6px',
+    fontSize: '14px',
     cursor: 'pointer',
   },
-  totalRow: {
+  loading: {
+    textAlign: 'center',
+    padding: '60px',
+    color: '#6b7280',
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+    gap: '20px',
+  },
+  card: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  },
+  cardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: '#fff',
-    borderRadius: '8px',
-    marginBottom: '20px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    borderBottom: '1px solid #e5e7eb',
   },
-  totalLabel: {
-    fontSize: '14px',
-    color: '#666',
-  },
-  totalValue: {
-    fontSize: '24px',
-    fontWeight: '700',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    background: '#fff',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  },
-  th: {
-    textAlign: 'left',
-    padding: '12px 16px',
-    fontSize: '12px',
-    fontWeight: '500',
-    color: '#666',
-    borderBottom: '1px solid #eee',
-  },
-  thRight: {
-    textAlign: 'right',
-    padding: '12px 16px',
-    fontSize: '12px',
-    fontWeight: '500',
-    color: '#666',
-    borderBottom: '1px solid #eee',
-  },
-  tr: {
-    borderBottom: '1px solid #f0f0f0',
-  },
-  td: {
-    padding: '12px 16px',
-    fontSize: '14px',
-  },
-  tdRight: {
-    padding: '12px 16px',
-    fontSize: '14px',
-    textAlign: 'right',
-    fontFamily: "'SF Mono', monospace",
+  exchangeName: {
+    fontSize: '18px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
   },
   dot: {
-    display: 'inline-block',
-    width: '8px',
-    height: '8px',
+    width: '10px',
+    height: '10px',
     borderRadius: '50%',
-    marginRight: '8px',
+    marginRight: '10px',
   },
-  ok: {
-    color: '#22c55e',
+  statusOk: {
     fontSize: '12px',
+    padding: '4px 10px',
+    borderRadius: '20px',
+    background: '#dcfce7',
+    color: '#166534',
+  },
+  statusError: {
+    fontSize: '12px',
+    padding: '4px 10px',
+    borderRadius: '20px',
+    background: '#fee2e2',
+    color: '#991b1b',
+  },
+  section: {
+    padding: '16px 20px',
+    borderBottom: '1px solid #f3f4f6',
+  },
+  totalSection: {
+    background: '#f9fafb',
+  },
+  sectionTitle: {
+    fontSize: '12px',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    marginBottom: '12px',
+    letterSpacing: '0.5px',
+  },
+  balanceTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+  },
+  coinName: {
+    padding: '6px 0',
+    fontSize: '14px',
+    fontWeight: '500',
+  },
+  coinAmount: {
+    padding: '6px 0',
+    fontSize: '14px',
+    textAlign: 'right',
+    fontFamily: "'SF Mono', Consolas, monospace",
   },
   empty: {
-    color: '#999',
-    fontSize: '12px',
+    padding: '30px 20px',
+    textAlign: 'center',
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
-  error: {
-    color: '#ef4444',
-    fontSize: '12px',
+  cardError: {
+    padding: '16px 20px',
+    background: '#fef2f2',
+    color: '#991b1b',
+    fontSize: '13px',
   },
   errorBox: {
-    marginTop: '20px',
     padding: '12px 16px',
     background: '#fef2f2',
-    borderRadius: '6px',
-    fontSize: '12px',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+    marginBottom: '20px',
     color: '#991b1b',
   },
 }
