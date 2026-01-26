@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 
+// Force Singapore region
+export const runtime = 'nodejs';
+export const preferredRegion = 'sin1';
+
 const exchanges = {
   binance: {
     baseUrl: 'https://api.binance.com',
