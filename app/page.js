@@ -78,27 +78,44 @@ export default function Dashboard() {
     const exData = balances[ex]
     const masterBal = exData?.master_breakdown || {}
     const masterUsd = exData?.master_usd || 0
+    const exchangeTotalUsd = exData?.exchange_total_usd || 0
     
-    const masterRow = {
+    // Exchange Total row (합계)
+    const totalRow = {
       exchange: ex.toUpperCase(),
+      account: 'Total',
+      balances: {},
+      totalUsd: exchangeTotalUsd,
+      isExchangeTotal: true
+    }
+    
+    // Master row
+    const masterRow = {
+      exchange: '',
       account: 'Master',
       balances: {},
       totalUsd: masterUsd,
-      isExchangeHeader: true
+      isMaster: true
     }
     
     for (const [coin, info] of Object.entries(masterBal)) {
-      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '')
+      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '')
       const existing = masterRow.balances[cleanCoin] || { amount: 0, usd: 0 }
       masterRow.balances[cleanCoin] = {
         amount: existing.amount + info.amount,
         usd: existing.usd + (info.usd || 0)
       }
+      // Total row에도 합산
+      const existingTotal = totalRow.balances[cleanCoin] || { amount: 0, usd: 0 }
+      totalRow.balances[cleanCoin] = {
+        amount: existingTotal.amount + info.amount,
+        usd: existingTotal.usd + (info.usd || 0)
+      }
       coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
     }
-    rows.push(masterRow)
 
     const subs = exData?.subaccounts_usd || {}
+    const subRows = []
     for (const [subName, subData] of Object.entries(subs)) {
       if (Math.abs(subData.usd) < 1) continue
       const row = {
@@ -109,16 +126,27 @@ export default function Dashboard() {
         isSub: true
       }
       for (const [coin, info] of Object.entries(subData.breakdown || {})) {
-        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '')
+        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '')
         const existing = row.balances[cleanCoin] || { amount: 0, usd: 0 }
         row.balances[cleanCoin] = {
           amount: existing.amount + info.amount,
           usd: existing.usd + (info.usd || 0)
         }
+        // Total row에도 합산
+        const existingTotal = totalRow.balances[cleanCoin] || { amount: 0, usd: 0 }
+        totalRow.balances[cleanCoin] = {
+          amount: existingTotal.amount + info.amount,
+          usd: existingTotal.usd + (info.usd || 0)
+        }
         coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
       }
-      rows.push(row)
+      subRows.push(row)
     }
+    
+    // Total -> Master -> Subs 순서로 추가
+    rows.push(totalRow)
+    rows.push(masterRow)
+    subRows.forEach(r => rows.push(r))
   }
 
   const topCoins = Object.entries(coinTotals)
@@ -347,11 +375,28 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr key={idx} style={{ background: row.isExchangeHeader ? '#fff' : (row.isSub ? '#fafafa' : '#fff'), borderBottom: '1px solid #f0f0f0' }}>
-                <td style={{ padding: '10px 16px', fontWeight: row.exchange ? '600' : '400', color: row.exchange ? '#1a1a1a' : '#666', borderRight: '1px solid #f0f0f0', background: row.isExchangeHeader ? '#f8f9fa' : 'transparent' }}>
+              <tr key={idx} style={{ 
+                background: row.isExchangeTotal ? '#eef2ff' : (row.isMaster ? '#fff' : (row.isSub ? '#fafafa' : '#fff')), 
+                borderBottom: row.isExchangeTotal ? '2px solid #c7d2fe' : '1px solid #f0f0f0'
+              }}>
+                <td style={{ 
+                  padding: '10px 16px', 
+                  fontWeight: row.exchange ? '700' : '400', 
+                  color: row.exchange ? '#1e3a8a' : '#666', 
+                  borderRight: '1px solid #f0f0f0', 
+                  background: row.isExchangeTotal ? '#dbeafe' : 'transparent'
+                }}>
                   {row.exchange}
                 </td>
-                <td style={{ padding: '10px 16px', paddingLeft: row.isSub ? '32px' : '16px', color: row.isSub ? '#666' : '#1a1a1a', fontFamily: row.isSub ? 'monospace' : 'inherit', fontSize: row.isSub ? '11px' : '12px', borderRight: '1px solid #f0f0f0' }}>
+                <td style={{ 
+                  padding: '10px 16px', 
+                  paddingLeft: row.isSub ? '32px' : (row.isMaster ? '24px' : '16px'), 
+                  color: row.isExchangeTotal ? '#1e3a8a' : (row.isSub ? '#666' : '#1a1a1a'), 
+                  fontFamily: row.isSub ? 'monospace' : 'inherit', 
+                  fontSize: row.isSub ? '11px' : '12px', 
+                  fontWeight: row.isExchangeTotal ? '600' : '400',
+                  borderRight: '1px solid #f0f0f0' 
+                }}>
                   {row.account}
                 </td>
                 {topCoins.map(coin => {
@@ -360,14 +405,21 @@ export default function Dashboard() {
                   const usd = coinData?.usd
                   const amountStr = formatAmount(amount)
                   return (
-                    <td key={coin} style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', borderRight: '1px solid #f5f5f5', verticalAlign: 'middle' }}>
+                    <td key={coin} style={{ 
+                      padding: '6px 8px', 
+                      textAlign: 'right', 
+                      fontFamily: 'monospace', 
+                      borderRight: '1px solid #f5f5f5', 
+                      verticalAlign: 'middle',
+                      fontWeight: row.isExchangeTotal ? '600' : '400'
+                    }}>
                       {amountStr ? (
                         <div>
-                          <div style={{ color: amount < 0 ? '#dc2626' : '#374151', fontSize: '12px' }}>
+                          <div style={{ color: amount < 0 ? '#dc2626' : (row.isExchangeTotal ? '#1e3a8a' : '#374151'), fontSize: '12px' }}>
                             {amountStr}
                           </div>
                           {usd && Math.abs(usd) >= 1 && (
-                            <div style={{ color: '#9ca3af', fontSize: '10px', marginTop: '2px' }}>
+                            <div style={{ color: row.isExchangeTotal ? '#3b82f6' : '#9ca3af', fontSize: '10px', marginTop: '2px' }}>
                               {formatUSD(usd)}
                             </div>
                           )}
@@ -378,7 +430,15 @@ export default function Dashboard() {
                     </td>
                   )
                 })}
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: '600', color: row.totalUsd < 0 ? '#dc2626' : (row.totalUsd === 0 ? '#9ca3af' : '#1a1a1a'), background: '#f0f7ff', fontFamily: 'monospace' }}>
+                <td style={{ 
+                  padding: '10px 16px', 
+                  textAlign: 'right', 
+                  fontWeight: row.isExchangeTotal ? '700' : '600', 
+                  color: row.totalUsd < 0 ? '#dc2626' : (row.totalUsd === 0 ? '#9ca3af' : (row.isExchangeTotal ? '#1e3a8a' : '#1a1a1a')), 
+                  background: row.isExchangeTotal ? '#bfdbfe' : '#f0f7ff', 
+                  fontFamily: 'monospace',
+                  fontSize: row.isExchangeTotal ? '14px' : '12px'
+                }}>
                   {formatUSD(row.totalUsd)}
                 </td>
               </tr>
