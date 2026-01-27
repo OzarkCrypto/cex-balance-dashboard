@@ -1,4 +1,4 @@
-// Build: 1769520000
+// Build: 1769530000
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,6 +11,12 @@ const formatUSD = (n) => {
   if (Math.abs(n) < 0.01) return '$0'
   const prefix = n < 0 ? '-$' : '$'
   return prefix + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
+const formatNum = (n, decimals = 2) => {
+  if (n === undefined || n === null || isNaN(n)) return '-'
+  if (Math.abs(n) < 0.0001) return '0'
+  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
 const formatAmount = (n) => {
@@ -109,22 +115,35 @@ const styles = {
   }
 }
 
-// ============ LOANS TAB ============
+// ============ LOANS TAB (엑셀 구조 반영) ============
 function LoansTab() {
-  const [loans, setLoans] = useState([])
+  const [receivables, setReceivables] = useState([])
+  const [payables, setPayables] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeSubTab, setActiveSubTab] = useState('summary')
   const [showForm, setShowForm] = useState(false)
+  const [formType, setFormType] = useState('receivable')
   const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState({
-    type: 'lend',
-    counterparty: '',
-    asset: '',
+  
+  // Receivable form
+  const [recForm, setRecForm] = useState({
+    bookName: '',
+    valuationDate: '',
+    currency: 'BTC',
+    amount: '',
+    comment: ''
+  })
+  
+  // Payable form
+  const [payForm, setPayForm] = useState({
+    clientName: '',
+    lastSettlementDate: '',
+    nextSettlementDate: '',
+    method: 'MONTHLY_COMP',
+    monthlyRate: '',
+    currency: 'BTC',
     principal: '',
-    apr: '',
-    startDate: '',
-    endDate: '',
-    interestType: 'simple',
-    notes: ''
+    comment: ''
   })
 
   const fetchLoans = async () => {
@@ -132,7 +151,8 @@ function LoansTab() {
     try {
       const res = await fetch('/api/loans')
       const data = await res.json()
-      setLoans(data.loans || [])
+      setReceivables(data.receivables || [])
+      setPayables(data.payables || [])
     } catch (e) {
       console.error(e)
     }
@@ -141,23 +161,27 @@ function LoansTab() {
 
   useEffect(() => { fetchLoans() }, [])
 
-  const calcAccruedInterest = (loan) => {
-    const principal = parseFloat(loan.principal) || 0
-    const apr = parseFloat(loan.apr) || 0
-    const start = new Date(loan.startDate)
+  // 이자 계산 (Payable)
+  const calcInterest = (p) => {
+    const principal = parseFloat(p.principal) || 0
+    const monthlyRate = parseFloat(p.monthlyRate) || 0
+    const lastDate = new Date(p.lastSettlementDate)
     const now = new Date()
-    const days = Math.floor((now - start) / (1000 * 60 * 60 * 24))
+    const days = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24))
     if (days <= 0) return 0
-    if (loan.interestType === 'simple') {
-      return principal * (apr / 100) * (days / 365)
+    
+    if (p.method === 'MONTHLY_SIMP') {
+      // 단리: principal * monthlyRate * (days / 30)
+      return principal * monthlyRate * (days / 30)
     } else {
-      return principal * (Math.pow(1 + apr / 100 / 365, days) - 1)
+      // 복리: principal * monthlyRate * (days / 30) - 간소화
+      return principal * monthlyRate * (days / 30)
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmitReceivable = async () => {
     const action = editingId ? 'update' : 'add'
-    const body = { action, loan: form, ...(editingId && { id: editingId }) }
+    const body = { action, type: 'receivable', item: recForm, ...(editingId && { id: editingId }) }
     try {
       const res = await fetch('/api/loans', {
         method: 'POST',
@@ -165,167 +189,358 @@ function LoansTab() {
         body: JSON.stringify(body)
       })
       const data = await res.json()
-      if (data.success) {
-        setLoans(data.loans)
+      if (data.receivables) {
+        setReceivables(data.receivables)
+        setPayables(data.payables || [])
         setShowForm(false)
         setEditingId(null)
-        setForm({ type: 'lend', counterparty: '', asset: '', principal: '', apr: '', startDate: '', endDate: '', interestType: 'simple', notes: '' })
+        setRecForm({ bookName: '', valuationDate: '', currency: 'BTC', amount: '', comment: '' })
       }
     } catch (e) {
       alert('저장 실패: ' + e.message)
     }
   }
 
-  const handleEdit = (loan) => {
-    setForm(loan)
-    setEditingId(loan.id)
+  const handleSubmitPayable = async () => {
+    const action = editingId ? 'update' : 'add'
+    const body = { action, type: 'payable', item: payForm, ...(editingId && { id: editingId }) }
+    try {
+      const res = await fetch('/api/loans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await res.json()
+      if (data.payables) {
+        setReceivables(data.receivables || [])
+        setPayables(data.payables)
+        setShowForm(false)
+        setEditingId(null)
+        setPayForm({ clientName: '', lastSettlementDate: '', nextSettlementDate: '', method: 'MONTHLY_COMP', monthlyRate: '', currency: 'BTC', principal: '', comment: '' })
+      }
+    } catch (e) {
+      alert('저장 실패: ' + e.message)
+    }
+  }
+
+  const handleEdit = (item, type) => {
+    if (type === 'receivable') {
+      setRecForm(item)
+      setFormType('receivable')
+    } else {
+      setPayForm(item)
+      setFormType('payable')
+    }
+    setEditingId(item.id)
     setShowForm(true)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, type) => {
     if (!confirm('정말 삭제?')) return
     try {
       const res = await fetch('/api/loans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', id })
+        body: JSON.stringify({ action: 'delete', type, id })
       })
       const data = await res.json()
-      if (data.success) setLoans(data.loans)
+      if (data.receivables !== undefined) {
+        setReceivables(data.receivables)
+        setPayables(data.payables)
+      }
     } catch (e) {
       alert('삭제 실패')
     }
   }
 
-  const totalLent = loans.filter(l => l.type === 'lend').reduce((sum, l) => sum + (parseFloat(l.principal) || 0), 0)
-  const totalBorrowed = loans.filter(l => l.type === 'borrow').reduce((sum, l) => sum + (parseFloat(l.principal) || 0), 0)
-  const totalAccruedReceivable = loans.filter(l => l.type === 'lend').reduce((sum, l) => sum + calcAccruedInterest(l), 0)
-  const totalAccruedPayable = loans.filter(l => l.type === 'borrow').reduce((sum, l) => sum + calcAccruedInterest(l), 0)
+  // Summary 계산
+  const summaryByAsset = {}
+  
+  // Receivable 집계
+  receivables.forEach(r => {
+    const currency = r.currency
+    if (!summaryByAsset[currency]) {
+      summaryByAsset[currency] = { receivable: 0, payable: 0 }
+    }
+    summaryByAsset[currency].receivable += parseFloat(r.amount) || 0
+  })
+  
+  // Payable 집계 (P + I)
+  payables.forEach(p => {
+    const currency = p.currency
+    if (!summaryByAsset[currency]) {
+      summaryByAsset[currency] = { receivable: 0, payable: 0 }
+    }
+    const principal = parseFloat(p.principal) || 0
+    const interest = calcInterest(p)
+    summaryByAsset[currency].payable += principal + interest
+  })
 
   return (
     <div>
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        <div style={styles.card}>
-          <div style={{ fontSize: '11px', color: '#666' }}>Total Lent (Principal)</div>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#10b981' }}>{formatUSD(totalLent)}</div>
-        </div>
-        <div style={styles.card}>
-          <div style={{ fontSize: '11px', color: '#666' }}>Accrued Interest (Receivable)</div>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#10b981' }}>{formatUSD(totalAccruedReceivable)}</div>
-        </div>
-        <div style={styles.card}>
-          <div style={{ fontSize: '11px', color: '#666' }}>Total Borrowed (Principal)</div>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#ef4444' }}>{formatUSD(totalBorrowed)}</div>
-        </div>
-        <div style={styles.card}>
-          <div style={{ fontSize: '11px', color: '#666' }}>Accrued Interest (Payable)</div>
-          <div style={{ fontSize: '20px', fontWeight: '700', color: '#ef4444' }}>{formatUSD(totalAccruedPayable)}</div>
-        </div>
+      {/* Sub Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <button 
+          onClick={() => setActiveSubTab('summary')} 
+          style={{ ...styles.button(activeSubTab === 'summary' ? 'blue' : 'gray'), padding: '6px 14px' }}
+        >Summary</button>
+        <button 
+          onClick={() => setActiveSubTab('receivable')} 
+          style={{ ...styles.button(activeSubTab === 'receivable' ? 'green' : 'gray'), padding: '6px 14px' }}
+        >Receivable</button>
+        <button 
+          onClick={() => setActiveSubTab('payable')} 
+          style={{ ...styles.button(activeSubTab === 'payable' ? 'red' : 'gray'), padding: '6px 14px' }}
+        >Payable</button>
       </div>
 
-      {/* Add Button */}
-      <div style={{ marginBottom: '16px' }}>
-        <button style={styles.button('blue')} onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ type: 'lend', counterparty: '', asset: '', principal: '', apr: '', startDate: '', endDate: '', interestType: 'simple', notes: '' }) }}>
-          {showForm ? '취소' : '+ 대출 추가'}
-        </button>
-      </div>
-
-      {/* Form */}
-      {showForm && (
-        <div style={{ ...styles.card, background: '#fff', border: '2px solid #2563eb' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-            <div>
-              <label style={styles.label}>Type</label>
-              <select style={styles.select} value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                <option value="lend">Lend (대여)</option>
-                <option value="borrow">Borrow (차입)</option>
-              </select>
-            </div>
-            <div>
-              <label style={styles.label}>Counterparty</label>
-              <input style={styles.input} value={form.counterparty} onChange={e => setForm({ ...form, counterparty: e.target.value })} placeholder="거래상대방" />
-            </div>
-            <div>
-              <label style={styles.label}>Asset</label>
-              <input style={styles.input} value={form.asset} onChange={e => setForm({ ...form, asset: e.target.value })} placeholder="USDT, BTC, etc." />
-            </div>
-            <div>
-              <label style={styles.label}>Principal (USD)</label>
-              <input style={styles.input} type="number" value={form.principal} onChange={e => setForm({ ...form, principal: e.target.value })} placeholder="원금" />
-            </div>
-            <div>
-              <label style={styles.label}>APR (%)</label>
-              <input style={styles.input} type="number" step="0.01" value={form.apr} onChange={e => setForm({ ...form, apr: e.target.value })} placeholder="연이율" />
-            </div>
-            <div>
-              <label style={styles.label}>Start Date</label>
-              <input style={styles.input} type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
-            </div>
-            <div>
-              <label style={styles.label}>End Date (optional)</label>
-              <input style={styles.input} type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} />
-            </div>
-            <div>
-              <label style={styles.label}>Interest Type</label>
-              <select style={styles.select} value={form.interestType} onChange={e => setForm({ ...form, interestType: e.target.value })}>
-                <option value="simple">Simple (단리)</option>
-                <option value="compound">Compound (복리)</option>
-              </select>
-            </div>
-            <div style={{ gridColumn: 'span 3' }}>
-              <label style={styles.label}>Notes</label>
-              <input style={styles.input} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="메모" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'end' }}>
-              <button style={styles.button('green')} onClick={handleSubmit}>{editingId ? '수정' : '저장'}</button>
-            </div>
+      {/* ===== SUMMARY VIEW ===== */}
+      {activeSubTab === 'summary' && (
+        <div>
+          <div style={{ ...styles.card, background: '#fff' }}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Asset</th>
+                  <th style={{ ...styles.th, textAlign: 'right', color: '#166534' }}>Receivable</th>
+                  <th style={{ ...styles.th, textAlign: 'right', color: '#991b1b' }}>Payable</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Net (Recv - Pay)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(summaryByAsset).map(([asset, data]) => {
+                  const net = data.receivable - data.payable
+                  return (
+                    <tr key={asset}>
+                      <td style={{ ...styles.td, fontWeight: '600' }}>{asset}</td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#166534' }}>
+                        {formatNum(data.receivable, asset === 'BTC' ? 6 : 2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#991b1b' }}>
+                        {formatNum(data.payable, asset === 'BTC' ? 6 : 2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', fontWeight: '600', color: net >= 0 ? '#166534' : '#991b1b' }}>
+                        {net >= 0 ? '+' : ''}{formatNum(net, asset === 'BTC' ? 6 : 2)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      {loading ? <div>Loading...</div> : (
-        <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Type</th>
-                <th style={styles.th}>Counterparty</th>
-                <th style={styles.th}>Asset</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>Principal</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>APR</th>
-                <th style={styles.th}>Start</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>Accrued Interest</th>
-                <th style={styles.th}>Notes</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loans.map(loan => (
-                <tr key={loan.id} style={{ background: loan.type === 'lend' ? '#f0fdf4' : '#fef2f2' }}>
-                  <td style={styles.td}>
-                    <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', background: loan.type === 'lend' ? '#dcfce7' : '#fee2e2', color: loan.type === 'lend' ? '#166534' : '#991b1b' }}>
-                      {loan.type === 'lend' ? 'LEND' : 'BORROW'}
-                    </span>
-                  </td>
-                  <td style={styles.td}>{loan.counterparty}</td>
-                  <td style={styles.td}>{loan.asset}</td>
-                  <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace' }}>{formatUSD(parseFloat(loan.principal))}</td>
-                  <td style={{ ...styles.td, textAlign: 'right' }}>{loan.apr}%</td>
-                  <td style={styles.td}>{loan.startDate}</td>
-                  <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: loan.type === 'lend' ? '#166534' : '#991b1b' }}>
-                    {formatUSD(calcAccruedInterest(loan))}
-                  </td>
-                  <td style={{ ...styles.td, fontSize: '11px', color: '#666' }}>{loan.notes}</td>
-                  <td style={styles.td}>
-                    <button onClick={() => handleEdit(loan)} style={{ ...styles.button('gray'), padding: '4px 8px', fontSize: '11px', marginRight: '4px' }}>Edit</button>
-                    <button onClick={() => handleDelete(loan.id)} style={{ ...styles.button('red'), padding: '4px 8px', fontSize: '11px' }}>Del</button>
-                  </td>
+      {/* ===== RECEIVABLE VIEW ===== */}
+      {activeSubTab === 'receivable' && (
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <button 
+              style={styles.button('green')} 
+              onClick={() => { 
+                setShowForm(!showForm); 
+                setFormType('receivable'); 
+                setEditingId(null); 
+                setRecForm({ bookName: '', valuationDate: '', currency: 'BTC', amount: '', comment: '' }) 
+              }}
+            >
+              {showForm && formType === 'receivable' ? '취소' : '+ Receivable 추가'}
+            </button>
+          </div>
+
+          {showForm && formType === 'receivable' && (
+            <div style={{ ...styles.card, background: '#f0fdf4', border: '2px solid #22c55e' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+                <div>
+                  <label style={styles.label}>Book Name</label>
+                  <input style={styles.input} value={recForm.bookName} onChange={e => setRecForm({ ...recForm, bookName: e.target.value })} placeholder="D-OTC, Onchain..." />
+                </div>
+                <div>
+                  <label style={styles.label}>Valuation Date</label>
+                  <input style={styles.input} type="date" value={recForm.valuationDate} onChange={e => setRecForm({ ...recForm, valuationDate: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Currency</label>
+                  <select style={styles.select} value={recForm.currency} onChange={e => setRecForm({ ...recForm, currency: e.target.value })}>
+                    <option value="BTC">BTC</option>
+                    <option value="USDT">USDT</option>
+                    <option value="USDC">USDC</option>
+                    <option value="ETH">ETH</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Amount</label>
+                  <input style={styles.input} type="number" step="any" value={recForm.amount} onChange={e => setRecForm({ ...recForm, amount: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Comment</label>
+                  <input style={styles.input} value={recForm.comment} onChange={e => setRecForm({ ...recForm, comment: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ marginTop: '12px' }}>
+                <button style={styles.button('green')} onClick={handleSubmitReceivable}>{editingId ? '수정' : '저장'}</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+            <table style={styles.table}>
+              <thead>
+                <tr style={{ background: '#f0fdf4' }}>
+                  <th style={styles.th}>Book Name</th>
+                  <th style={styles.th}>Valuation Date</th>
+                  <th style={styles.th}>Currency</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Amount</th>
+                  <th style={styles.th}>Comment</th>
+                  <th style={styles.th}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {receivables.map(r => (
+                  <tr key={r.id}>
+                    <td style={{ ...styles.td, fontWeight: '500' }}>{r.bookName}</td>
+                    <td style={styles.td}>{r.valuationDate}</td>
+                    <td style={styles.td}>{r.currency}</td>
+                    <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', fontWeight: '600', color: '#166534' }}>
+                      {formatNum(parseFloat(r.amount), r.currency === 'BTC' ? 6 : 2)}
+                    </td>
+                    <td style={{ ...styles.td, fontSize: '11px', color: '#666' }}>{r.comment}</td>
+                    <td style={styles.td}>
+                      <button onClick={() => handleEdit(r, 'receivable')} style={{ ...styles.button('gray'), padding: '4px 8px', fontSize: '11px', marginRight: '4px' }}>Edit</button>
+                      <button onClick={() => handleDelete(r.id, 'receivable')} style={{ ...styles.button('red'), padding: '4px 8px', fontSize: '11px' }}>Del</button>
+                    </td>
+                  </tr>
+                ))}
+                {receivables.length === 0 && (
+                  <tr><td colSpan={6} style={{ ...styles.td, textAlign: 'center', color: '#999' }}>No data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ===== PAYABLE VIEW ===== */}
+      {activeSubTab === 'payable' && (
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <button 
+              style={styles.button('red')} 
+              onClick={() => { 
+                setShowForm(!showForm); 
+                setFormType('payable'); 
+                setEditingId(null); 
+                setPayForm({ clientName: '', lastSettlementDate: '', nextSettlementDate: '', method: 'MONTHLY_COMP', monthlyRate: '', currency: 'BTC', principal: '', comment: '' }) 
+              }}
+            >
+              {showForm && formType === 'payable' ? '취소' : '+ Payable 추가'}
+            </button>
+          </div>
+
+          {showForm && formType === 'payable' && (
+            <div style={{ ...styles.card, background: '#fef2f2', border: '2px solid #ef4444' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                <div>
+                  <label style={styles.label}>Client Name</label>
+                  <input style={styles.input} value={payForm.clientName} onChange={e => setPayForm({ ...payForm, clientName: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Last Settlement Date</label>
+                  <input style={styles.input} type="date" value={payForm.lastSettlementDate} onChange={e => setPayForm({ ...payForm, lastSettlementDate: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Next Settlement Date</label>
+                  <input style={styles.input} type="date" value={payForm.nextSettlementDate} onChange={e => setPayForm({ ...payForm, nextSettlementDate: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Method</label>
+                  <select style={styles.select} value={payForm.method} onChange={e => setPayForm({ ...payForm, method: e.target.value })}>
+                    <option value="MONTHLY_COMP">Monthly Compound (복리)</option>
+                    <option value="MONTHLY_SIMP">Monthly Simple (단리)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Monthly Rate (ex: 0.00375 = 0.375%)</label>
+                  <input style={styles.input} type="number" step="any" value={payForm.monthlyRate} onChange={e => setPayForm({ ...payForm, monthlyRate: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Currency</label>
+                  <select style={styles.select} value={payForm.currency} onChange={e => setPayForm({ ...payForm, currency: e.target.value })}>
+                    <option value="BTC">BTC</option>
+                    <option value="USDT">USDT</option>
+                    <option value="USDC">USDC</option>
+                    <option value="ETH">ETH</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Principal</label>
+                  <input style={styles.input} type="number" step="any" value={payForm.principal} onChange={e => setPayForm({ ...payForm, principal: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Comment</label>
+                  <input style={styles.input} value={payForm.comment} onChange={e => setPayForm({ ...payForm, comment: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ marginTop: '12px' }}>
+                <button style={styles.button('red')} onClick={handleSubmitPayable}>{editingId ? '수정' : '저장'}</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden' }}>
+            <table style={styles.table}>
+              <thead>
+                <tr style={{ background: '#fef2f2' }}>
+                  <th style={styles.th}>Client</th>
+                  <th style={styles.th}>Last Settle</th>
+                  <th style={styles.th}>Next Settle</th>
+                  <th style={styles.th}>Method</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Rate/Mo</th>
+                  <th style={styles.th}>Curr</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Principal</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Interest</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>P + I</th>
+                  <th style={styles.th}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payables.map(p => {
+                  const principal = parseFloat(p.principal) || 0
+                  const interest = calcInterest(p)
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ ...styles.td, fontWeight: '500' }}>{p.clientName}</td>
+                      <td style={{ ...styles.td, fontSize: '11px' }}>{p.lastSettlementDate}</td>
+                      <td style={{ ...styles.td, fontSize: '11px' }}>{p.nextSettlementDate}</td>
+                      <td style={{ ...styles.td, fontSize: '10px' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '4px', background: p.method === 'MONTHLY_COMP' ? '#dbeafe' : '#fef3c7', color: p.method === 'MONTHLY_COMP' ? '#1e40af' : '#92400e' }}>
+                          {p.method === 'MONTHLY_COMP' ? 'COMP' : 'SIMP'}
+                        </span>
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{(parseFloat(p.monthlyRate) * 100).toFixed(4)}%</td>
+                      <td style={styles.td}>{p.currency}</td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace' }}>
+                        {formatNum(principal, p.currency === 'BTC' ? 6 : 2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#dc2626' }}>
+                        {formatNum(interest, p.currency === 'BTC' ? 6 : 2)}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', fontWeight: '600', color: '#991b1b' }}>
+                        {formatNum(principal + interest, p.currency === 'BTC' ? 6 : 2)}
+                      </td>
+                      <td style={styles.td}>
+                        <button onClick={() => handleEdit(p, 'payable')} style={{ ...styles.button('gray'), padding: '4px 8px', fontSize: '11px', marginRight: '4px' }}>Edit</button>
+                        <button onClick={() => handleDelete(p.id, 'payable')} style={{ ...styles.button('red'), padding: '4px 8px', fontSize: '11px' }}>Del</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {payables.length === 0 && (
+                  <tr><td colSpan={10} style={{ ...styles.td, textAlign: 'center', color: '#999' }}>No data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -583,7 +798,7 @@ function LockedTokensTab() {
   )
 }
 
-// ============ CEX BALANCE TAB (기존 코드) ============
+// ============ CEX BALANCE TAB ============
 function CEXBalanceTab() {
   const [data, setData] = useState(null)
   const [snapshots, setSnapshots] = useState([])
