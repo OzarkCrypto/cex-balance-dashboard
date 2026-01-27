@@ -9,9 +9,13 @@ async function getFile() {
     `https://api.github.com/repos/${REPO}/contents/${FILE_PATH}`,
     { headers: { Authorization: `token ${GITHUB_TOKEN}` }, cache: 'no-store' }
   )
-  if (res.status === 404) return { content: [], sha: null }
+  if (res.status === 404) return { content: { receivables: [], payables: [] }, sha: null }
   const data = await res.json()
   const content = JSON.parse(Buffer.from(data.content, 'base64').toString())
+  // 기존 데이터 마이그레이션
+  if (Array.isArray(content)) {
+    return { content: { receivables: [], payables: [] }, sha: data.sha }
+  }
   return { content, sha: data.sha }
 }
 
@@ -35,7 +39,7 @@ async function saveFile(content, sha) {
 export async function GET() {
   try {
     const { content } = await getFile()
-    return NextResponse.json({ loans: content })
+    return NextResponse.json(content)
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
@@ -43,23 +47,25 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    const { action, loan, id } = await request.json()
+    const { action, type, item, id } = await request.json()
     const { content, sha } = await getFile()
     
+    const list = type === 'receivable' ? content.receivables : content.payables
+    
     if (action === 'add') {
-      const newLoan = { ...loan, id: Date.now().toString(), createdAt: new Date().toISOString() }
-      content.push(newLoan)
+      const newItem = { ...item, id: Date.now().toString(), createdAt: new Date().toISOString() }
+      list.push(newItem)
     } else if (action === 'update') {
-      const idx = content.findIndex(l => l.id === id)
-      if (idx !== -1) content[idx] = { ...content[idx], ...loan, updatedAt: new Date().toISOString() }
+      const idx = list.findIndex(l => l.id === id)
+      if (idx !== -1) list[idx] = { ...list[idx], ...item, updatedAt: new Date().toISOString() }
     } else if (action === 'delete') {
-      const idx = content.findIndex(l => l.id === id)
-      if (idx !== -1) content.splice(idx, 1)
+      const idx = list.findIndex(l => l.id === id)
+      if (idx !== -1) list.splice(idx, 1)
     }
     
     const ok = await saveFile(content, sha)
     if (!ok) throw new Error('Failed to save')
-    return NextResponse.json({ success: true, loans: content })
+    return NextResponse.json({ success: true, ...content })
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
