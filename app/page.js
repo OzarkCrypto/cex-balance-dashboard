@@ -54,9 +54,9 @@ export default function Dashboard() {
     fetchSnapshots()
   }, [])
 
-  // 히스토리 뷰에서 선택된 날짜의 데이터
-  const displayData = selectedDate 
-    ? snapshots.find(s => s.date === selectedDate) 
+  // 히스토리 뷰에서는 스냅샷만 표시
+  const displayData = view === 'history'
+    ? (selectedDate ? snapshots.find(s => s.date === selectedDate) : snapshots[0])
     : data
 
   if (!data && loading) {
