@@ -167,6 +167,15 @@ def fetch_all_balances(event):
             errors['zoomex'] = str(e)
             print(f"✗ Zoomex: {e}")
     
+    # HTX
+    if os.environ.get('HTX_API_KEY'):
+        try:
+            results['htx'] = fetch_htx()
+            print(f"✓ HTX: {len(results['htx'].get('total', {}))} assets")
+        except Exception as e:
+            errors['htx'] = str(e)
+            print(f"✗ HTX: {e}")
+    
     # USD 가치 계산
     calculate_usd_values(results)
     
@@ -742,5 +751,79 @@ def fetch_zoomex():
                 # uPnL 분리 저장
                 if upl != 0:
                     result['upnl'][coin['coin']] = upl
+    
+    return result
+
+
+# ============ HTX ============
+def fetch_htx():
+    api_key = os.environ.get('HTX_API_KEY', '')
+    api_secret = os.environ.get('HTX_API_SECRET', '')
+    
+    if not api_key or not api_secret:
+        return {'master': {}, 'subaccounts': {}, 'total': {}}
+    
+    result = {'master': {}, 'subaccounts': {}, 'total': {}}
+    
+    def htx_req(method, endpoint, params=None):
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+        params = params or {}
+        params.update({
+            'AccessKeyId': api_key,
+            'SignatureMethod': 'HmacSHA256',
+            'SignatureVersion': '2',
+            'Timestamp': timestamp
+        })
+        
+        # Sort params and create query string
+        sorted_params = sorted(params.items())
+        query_string = urllib.parse.urlencode(sorted_params)
+        
+        # Create signature
+        sign_str = f"{method}\napi.huobi.pro\n{endpoint}\n{query_string}"
+        signature = base64.b64encode(
+            hmac.new(api_secret.encode(), sign_str.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        # URL encode signature
+        params['Signature'] = signature
+        url = f"https://api.huobi.pro{endpoint}?{urllib.parse.urlencode(params)}"
+        
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    
+    # Step 1: Get all accounts
+    try:
+        accounts_data = htx_req('GET', '/v1/account/accounts')
+        if accounts_data.get('status') == 'ok':
+            for acc in accounts_data.get('data', []):
+                acc_id = acc['id']
+                acc_type = acc['type']  # spot, margin, otc, point, super-margin, etc
+                
+                # Step 2: Get balance for each account
+                try:
+                    bal_data = htx_req('GET', f'/v1/account/accounts/{acc_id}/balance')
+                    if bal_data.get('status') == 'ok':
+                        for item in bal_data.get('data', {}).get('list', []):
+                            balance = float(item.get('balance', 0))
+                            if balance > 0:
+                                ccy = item['currency'].upper()
+                                bal_type = item['type']  # trade, frozen
+                                
+                                if acc_type == 'spot':
+                                    result['master'][ccy] = result['master'].get(ccy, 0) + balance
+                                    result['total'][ccy] = result['total'].get(ccy, 0) + balance
+                                    print(f"HTX spot {ccy}: {balance} ({bal_type})")
+                                else:
+                                    # margin, super-margin 등은 별도 키로
+                                    key = f"{ccy}_{acc_type.upper().replace('-', '_')}"
+                                    result['master'][key] = result['master'].get(key, 0) + balance
+                                    result['total'][key] = result['total'].get(key, 0) + balance
+                                    print(f"HTX {acc_type} {ccy}: {balance}")
+                except Exception as e:
+                    print(f"HTX account {acc_id} balance error: {e}")
+    except Exception as e:
+        print(f"HTX accounts error: {e}")
     
     return result
