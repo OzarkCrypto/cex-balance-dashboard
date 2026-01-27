@@ -736,6 +736,12 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('cex')
   return (
     <div style={styles.container}>
+      {/* Header */}
+      <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '3px solid #1e3a5f' }}>
+        <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700', color: '#1e3a5f', letterSpacing: '-0.5px' }}>Liquid Fund Dashboard</h1>
+      </div>
+
+      {/* Tabs */}
       <div style={styles.tabs}>
         <button style={styles.tab(activeTab === 'cex')} onClick={() => setActiveTab('cex')}>CEX Balance</button>
         <button style={styles.tab(activeTab === 'loans')} onClick={() => setActiveTab('loans')}>Loans</button>
@@ -747,3 +753,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
