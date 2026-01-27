@@ -1,4 +1,4 @@
-// Build: 1769505946
+// Build: 1769506539
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -100,7 +100,9 @@ export default function Dashboard() {
     }
     
     for (const [coin, info] of Object.entries(masterBal)) {
-      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '')
+      let cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '').replace('_DEPOSIT_EARNING', '')
+      // HTX Earn: U → USDT
+      if (cleanCoin === 'U') cleanCoin = 'USDT'
       const existing = masterRow.balances[cleanCoin] || { amount: 0, usd: 0 }
       masterRow.balances[cleanCoin] = {
         amount: existing.amount + info.amount,
@@ -127,7 +129,8 @@ export default function Dashboard() {
         isSub: true
       }
       for (const [coin, info] of Object.entries(subData.breakdown || {})) {
-        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '')
+        let cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '').replace('_DEPOSIT_EARNING', '')
+        if (cleanCoin === 'U') cleanCoin = 'USDT'
         const existing = row.balances[cleanCoin] || { amount: 0, usd: 0 }
         row.balances[cleanCoin] = {
           amount: existing.amount + info.amount,
