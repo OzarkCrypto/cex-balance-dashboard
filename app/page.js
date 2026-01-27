@@ -1,4 +1,4 @@
-// Build: 1769506539
+// Build: 1769506613
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -100,7 +100,18 @@ export default function Dashboard() {
     }
     
     for (const [coin, info] of Object.entries(masterBal)) {
-      let cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '').replace('_DEPOSIT_EARNING', '')
+      // suffix 제거 (긴 것 먼저!)
+      let cleanCoin = coin
+        .replace('_DEPOSIT_EARNING', '')
+        .replace('_COIN_FUTURES', '')
+        .replace('_EARN_LOCKED', '')
+        .replace('_SUPER_MARGIN', '')
+        .replace('_FUTURES', '')
+        .replace('_MARGIN', '')
+        .replace('_POINT', '')
+        .replace('_EARN', '')
+        .replace('_FUND', '')
+        .replace('_OTC', '')
       // HTX Earn: U → USDT
       if (cleanCoin === 'U') cleanCoin = 'USDT'
       const existing = masterRow.balances[cleanCoin] || { amount: 0, usd: 0 }
@@ -129,7 +140,17 @@ export default function Dashboard() {
         isSub: true
       }
       for (const [coin, info] of Object.entries(subData.breakdown || {})) {
-        let cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '').replace('_DEPOSIT_EARNING', '')
+        let cleanCoin = coin
+          .replace('_DEPOSIT_EARNING', '')
+          .replace('_COIN_FUTURES', '')
+          .replace('_EARN_LOCKED', '')
+          .replace('_SUPER_MARGIN', '')
+          .replace('_FUTURES', '')
+          .replace('_MARGIN', '')
+          .replace('_POINT', '')
+          .replace('_EARN', '')
+          .replace('_FUND', '')
+          .replace('_OTC', '')
         if (cleanCoin === 'U') cleanCoin = 'USDT'
         const existing = row.balances[cleanCoin] || { amount: 0, usd: 0 }
         row.balances[cleanCoin] = {
