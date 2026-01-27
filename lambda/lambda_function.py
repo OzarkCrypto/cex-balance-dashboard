@@ -55,8 +55,22 @@ def get_usd_value(coin, amount, exchange_usd_values=None):
     if exchange_usd_values and coin in exchange_usd_values:
         return exchange_usd_values[coin]
     
-    # 접미사 제거: _FUTURES, _EARN, _EARN_LOCKED, _MARGIN, _FUND, _SUPER_MARGIN 등
-    base_coin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '')
+    # 접미사 제거 (긴 것 먼저!)
+    base_coin = coin
+    base_coin = base_coin.replace('_DEPOSIT_EARNING', '')  # HTX Earn 먼저
+    base_coin = base_coin.replace('_COIN_FUTURES', '')
+    base_coin = base_coin.replace('_EARN_LOCKED', '')
+    base_coin = base_coin.replace('_SUPER_MARGIN', '')
+    base_coin = base_coin.replace('_FUTURES', '')
+    base_coin = base_coin.replace('_MARGIN', '')
+    base_coin = base_coin.replace('_POINT', '')
+    base_coin = base_coin.replace('_EARN', '')
+    base_coin = base_coin.replace('_FUND', '')
+    base_coin = base_coin.replace('_OTC', '')
+    
+    # HTX Earn: U → USDT
+    if base_coin == 'U':
+        base_coin = 'USDT'
     
     price = PRICES.get(base_coin, 0)
     return amount * price
