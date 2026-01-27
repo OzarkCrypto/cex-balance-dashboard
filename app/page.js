@@ -1,4 +1,4 @@
-// Build: 1769494309
+// Build: 1769505946
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -71,7 +71,7 @@ export default function Dashboard() {
   // 데이터 파싱
   const coinTotals = {}
   const rows = []
-  const exchangeOrder = ['binance', 'bybit', 'okx', 'zoomex', 'kucoin', 'kraken']
+  const exchangeOrder = ['binance', 'bybit', 'okx', 'htx', 'zoomex', 'kucoin', 'kraken']
   
   const balances = displayData?.balances || data?.balances || {}
   
@@ -100,7 +100,7 @@ export default function Dashboard() {
     }
     
     for (const [coin, info] of Object.entries(masterBal)) {
-      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
+      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '')
       const existing = masterRow.balances[cleanCoin] || { amount: 0, usd: 0 }
       masterRow.balances[cleanCoin] = {
         amount: existing.amount + info.amount,
@@ -127,7 +127,7 @@ export default function Dashboard() {
         isSub: true
       }
       for (const [coin, info] of Object.entries(subData.breakdown || {})) {
-        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
+        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '')
         const existing = row.balances[cleanCoin] || { amount: 0, usd: 0 }
         row.balances[cleanCoin] = {
           amount: existing.amount + info.amount,
