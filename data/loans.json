@@ -1,1 +1,172 @@
-[]
+{
+  "receivables": [
+    {
+      "id": "1",
+      "bookName": "Discretionary trading",
+      "valuationDate": "2026-01-21",
+      "currency": "BTC",
+      "amount": "6",
+      "comment": ""
+    },
+    {
+      "id": "2",
+      "bookName": "Centeral-Doppler",
+      "valuationDate": "2026-01-21",
+      "currency": "BTC",
+      "amount": "2",
+      "comment": ""
+    },
+    {
+      "id": "3",
+      "bookName": "D-OTC",
+      "valuationDate": "2026-01-21",
+      "currency": "BTC",
+      "amount": "1.064",
+      "comment": ""
+    },
+    {
+      "id": "4",
+      "bookName": "Onchain",
+      "valuationDate": "2026-01-21",
+      "currency": "BTC",
+      "amount": "53.106",
+      "comment": ""
+    },
+    {
+      "id": "5",
+      "bookName": "GS",
+      "valuationDate": "2026-01-21",
+      "currency": "BTC",
+      "amount": "1",
+      "comment": ""
+    },
+    {
+      "id": "6",
+      "bookName": "Axis",
+      "valuationDate": "2026-01-21",
+      "currency": "USDT",
+      "amount": "1600000",
+      "comment": ""
+    },
+    {
+      "id": "7",
+      "bookName": "Axis",
+      "valuationDate": "2026-01-21",
+      "currency": "USDT",
+      "amount": "800000",
+      "comment": ""
+    }
+  ],
+  "payables": [
+    {
+      "id": "100",
+      "clientName": "Junhyung Jeon",
+      "lastSettlementDate": "2026-01-01",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_COMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "3.392640834393416",
+      "comment": ""
+    },
+    {
+      "id": "101",
+      "clientName": "Junghwan Cho",
+      "lastSettlementDate": "2026-01-01",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_COMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "8.466166580827005",
+      "comment": ""
+    },
+    {
+      "id": "102",
+      "clientName": "Jongbaek Park",
+      "lastSettlementDate": "2026-01-01",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_COMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "4.511012135417423",
+      "comment": ""
+    },
+    {
+      "id": "103",
+      "clientName": "Joongsub Han",
+      "lastSettlementDate": "2026-01-01",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_SIMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "5",
+      "comment": ""
+    },
+    {
+      "id": "104",
+      "clientName": "Seeeun Ha",
+      "lastSettlementDate": "2026-01-01",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_COMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "17.68345611273828",
+      "comment": ""
+    },
+    {
+      "id": "105",
+      "clientName": "Charles",
+      "lastSettlementDate": "2026-01-01",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_COMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "6.361028191074219",
+      "comment": ""
+    },
+    {
+      "id": "106",
+      "clientName": "Woosung Son",
+      "lastSettlementDate": "2026-01-16",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_COMP",
+      "monthlyRate": "0.00375",
+      "currency": "BTC",
+      "principal": "17.3",
+      "comment": ""
+    },
+    {
+      "id": "107",
+      "clientName": "Shinlabs",
+      "lastSettlementDate": "2026-01-20",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_SIMP",
+      "monthlyRate": "0.0091666667",
+      "currency": "USDC",
+      "principal": "104691",
+      "comment": ""
+    },
+    {
+      "id": "108",
+      "clientName": "Shinlabs",
+      "lastSettlementDate": "2026-01-20",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_SIMP",
+      "monthlyRate": "0.0091666667",
+      "currency": "USDT",
+      "principal": "1519289",
+      "comment": ""
+    },
+    {
+      "id": "109",
+      "clientName": "Shinlabs",
+      "lastSettlementDate": "2026-01-21",
+      "nextSettlementDate": "2026-02-01",
+      "method": "MONTHLY_SIMP",
+      "monthlyRate": "0.00916666",
+      "currency": "USDT",
+      "principal": "800000",
+      "comment": ""
+    }
+  ]
+}
