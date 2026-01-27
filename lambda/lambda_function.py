@@ -55,8 +55,8 @@ def get_usd_value(coin, amount, exchange_usd_values=None):
     if exchange_usd_values and coin in exchange_usd_values:
         return exchange_usd_values[coin]
     
-    # 접미사 제거: _FUTURES, _EARN, _EARN_LOCKED, _MARGIN, _FUND 등
-    base_coin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
+    # 접미사 제거: _FUTURES, _EARN, _EARN_LOCKED, _MARGIN, _FUND, _SUPER_MARGIN 등
+    base_coin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '').replace('_SUPER_MARGIN', '').replace('_OTC', '').replace('_POINT', '')
     
     price = PRICES.get(base_coin, 0)
     return amount * price
