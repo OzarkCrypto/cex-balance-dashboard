@@ -669,7 +669,7 @@ function CEXBalanceTab() {
     const totalRow = { exchange: ex.toUpperCase(), account: 'Total', balances: {}, totalUsd: exchangeTotalUsd, isExchangeTotal: true }
     const masterRow = { exchange: '', account: 'Master', balances: {}, totalUsd: masterUsd, isMaster: true }
     for (const [coin, info] of Object.entries(masterBal)) {
-      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
+      const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_DEPOSIT_EARNING', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
       const existing = masterRow.balances[cleanCoin] || { amount: 0, usd: 0 }; masterRow.balances[cleanCoin] = { amount: existing.amount + info.amount, usd: existing.usd + (info.usd || 0) }
       const existingTotal = totalRow.balances[cleanCoin] || { amount: 0, usd: 0 }; totalRow.balances[cleanCoin] = { amount: existingTotal.amount + info.amount, usd: existingTotal.usd + (info.usd || 0) }
       coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
@@ -679,7 +679,7 @@ function CEXBalanceTab() {
       if (Math.abs(subData.usd) < 1) continue
       const row = { exchange: '', account: subName.length > 25 ? subName.slice(0, 22) + '...' : subName, balances: {}, totalUsd: subData.usd, isSub: true }
       for (const [coin, info] of Object.entries(subData.breakdown || {})) {
-        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
+        const cleanCoin = coin.replace('_FUTURES', '').replace('_COIN_FUTURES', '').replace('_DEPOSIT_EARNING', '').replace('_EARN_LOCKED', '').replace('_EARN', '').replace('_MARGIN', '').replace('_FUND', '')
         const existing = row.balances[cleanCoin] || { amount: 0, usd: 0 }; row.balances[cleanCoin] = { amount: existing.amount + info.amount, usd: existing.usd + (info.usd || 0) }
         const existingTotal = totalRow.balances[cleanCoin] || { amount: 0, usd: 0 }; totalRow.balances[cleanCoin] = { amount: existingTotal.amount + info.amount, usd: existingTotal.usd + (info.usd || 0) }
         coinTotals[cleanCoin] = (coinTotals[cleanCoin] || 0) + Math.abs(info.usd || 0)
@@ -753,5 +753,6 @@ export default function Dashboard() {
     </div>
   )
 }
+
 
 
