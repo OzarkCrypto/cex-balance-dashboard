@@ -610,10 +610,10 @@ def fetch_okx():
                                     sub_usd[ccy] = eq_usd
                                     result['usd_values'][ccy] = result['usd_values'].get(ccy, 0) + eq_usd
                                 print(f"OKX {sub_name} {ccy}: {total} (${eq_usd:.2f})")
-                        if sub_bal:
-                            result['subaccounts'][sub_name] = sub_bal
-                            result['subaccounts_usd_direct'] = result.get('subaccounts_usd_direct', {})
-                            result['subaccounts_usd_direct'][sub_name] = sub_usd
+                        # Always add subaccount even if empty
+                        result['subaccounts'][sub_name] = sub_bal if sub_bal else {}
+                        result['subaccounts_usd_direct'] = result.get('subaccounts_usd_direct', {})
+                        result['subaccounts_usd_direct'][sub_name] = sub_usd if sub_usd else {}
                 except Exception as e:
                     print(f"OKX subaccount {sub_name} error: {e}")
     except Exception as e:
