@@ -285,7 +285,9 @@ def lambda_handler(event, context):
 
 def http_request(url, headers=None, method='GET', body=None):
     """HTTP 요청 유틸리티"""
-    req = urllib.request.Request(url, headers=headers or {}, method=method)
+    headers = headers or {}
+    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    req = urllib.request.Request(url, headers=headers, method=method)
     if body:
         req.data = body.encode() if isinstance(body, str) else body
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -841,3 +843,4 @@ def fetch_htx():
         print(f"HTX accounts error: {e}")
     
     return result
+
