@@ -361,7 +361,7 @@ function LoansTab() {
                   <th style={{ ...styles.th, textAlign: 'right', color: '#166534' }}>Receivable</th>
                   <th style={{ ...styles.th, textAlign: 'right', color: '#991b1b' }}>Payable (Principal)</th>
                   <th style={{ ...styles.th, textAlign: 'right', color: '#dc2626' }}>Accrued Interest</th>
-                  <th style={{ ...styles.th, textAlign: 'right', color: '#9333ea' }}>Unpaid Interest (SIMP)</th>
+                  <th style={{ ...styles.th, textAlign: 'right', color: '#7c3aed', fontWeight: '700' }}>Payable (Total)</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Net Position</th>
                 </tr>
               </thead>
@@ -376,7 +376,7 @@ function LoansTab() {
                       <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#166534' }}>{formatNum(data.receivable, decimals)}</td>
                       <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#991b1b' }}>{formatNum(data.payable, decimals)}</td>
                       <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#dc2626' }}>{formatNum(data.payableInterest, decimals)}</td>
-                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#9333ea' }}>{formatNum(data.unpaidInterest, decimals)}</td>
+                      <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', color: '#7c3aed', fontWeight: '700' }}>{formatNum(totalPayable, decimals)}</td>
                       <td style={{ ...styles.td, textAlign: 'right', fontFamily: 'monospace', fontWeight: '600', color: net >= 0 ? '#166534' : '#991b1b' }}>
                         {net >= 0 ? '+' : ''}{formatNum(net, decimals)}
                       </td>
